@@ -1,7 +1,7 @@
 import {Tabs} from "expo-router";
 
 export default function TabsLayout() {
-    return (    
+    return (
         <Tabs
             screenOptions={{
                 headerShown: false,
@@ -11,8 +11,14 @@ export default function TabsLayout() {
                 },
                 tabBarActiveTintColor: "#fff",
                 tabBarInactiveTintColor: "#888",
-            }}  
-        >   
+            }}
+        >
+            <Tabs.Screen
+                name="calendar"
+                options={{
+                    title: "Calendar",
+                }}
+            />
             <Tabs.Screen
                 name="index"
                 options={{
@@ -34,9 +40,9 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="exercise"
                 options={{
-                    href:null,
+                    href: null,
                 }}
             />
-        </Tabs> 
+        </Tabs>
     );
 }
