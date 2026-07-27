@@ -1,53 +1,39 @@
 import { useState } from "react";
 
+import { loadWorkouts, saveWorkouts } from "../storage/workoutStorage";
 import { Workout } from "../types/workout";
-
-import {
-  loadWorkouts,
-  saveWorkouts,
-} from "../storage/workoutStorage";
-
-import {
-  findWorkoutById,
-} from "../utils/workoutHelpers";
+import { findWorkoutById } from "../utils/workoutHelpers";
 
 export function useWorkout() {
+  const [workout, setWorkout] = useState<Workout | null>(null);
 
-  const [workout, setWorkout] =
-    useState<Workout | null>(null);
-
-  async function loadWorkoutById(
-    id: string
-  ) {
-
-    const workouts =
-      await loadWorkouts();
-
-    const foundWorkout =
-      findWorkoutById(
-        workouts,
-        id
-      );
+  async function loadWorkoutById(id: string) {
+    const workouts = await loadWorkouts();
+    const foundWorkout = findWorkoutById(workouts, id);
 
     setWorkout(foundWorkout);
   }
 
-  async function addExercise(
+  async function saveUpdatedWorkout(
+    updatedWorkouts: Workout[],
     workoutId: string,
-    exerciseName: string
   ) {
+    await saveWorkouts(updatedWorkouts);
 
-    if (
-      exerciseName.trim() === ""
-    ) {
+    setWorkout(findWorkoutById(updatedWorkouts, workoutId));
+  }
+
+  async function addExercise(workoutId: string, exerciseName: string) {
+    const trimmedName = exerciseName.trim();
+
+    if (trimmedName === "") {
       return;
     }
 
-    const workouts =
-      await loadWorkouts();
+    try {
+      const workouts = await loadWorkouts();
 
-    const updatedWorkouts =
-      workouts.map((item) =>
+      const updatedWorkouts = workouts.map((item) =>
         item.id === workoutId
           ? {
               ...item,
@@ -55,95 +41,55 @@ export function useWorkout() {
                 ...item.exercises,
                 {
                   id: Date.now().toString(),
-                  name: exerciseName,
+                  name: trimmedName,
                   sets: [],
                 },
               ],
             }
-          : item
+          : item,
       );
 
-    await saveWorkouts(
-      updatedWorkouts
-    );
-
-    setWorkout(
-      findWorkoutById(
-        updatedWorkouts,
-        workoutId
-      )
-    );
+      await saveUpdatedWorkout(updatedWorkouts, workoutId);
+    } catch (error) {
+      console.log("Error adding exercise", error);
+    }
   }
 
-  async function addSet(
-    workoutId: string,
-    exerciseId: string
-  ) {
-
+  async function addSet(workoutId: string, exerciseId: string) {
     try {
+      const workouts = await loadWorkouts();
 
-      const workouts =
-        await loadWorkouts();
+      const updatedWorkouts = workouts.map((item) => {
+        if (item.id !== workoutId) {
+          return item;
+        }
 
-      const updatedWorkouts =
-        workouts.map((item) => {
-
-          if (
-            item.id === workoutId
-          ) {
-
-            const updatedExercises =
-              item.exercises.map(
-                (exercise) => {
-
-                  if (
-                    exercise.id ===
-                    exerciseId
-                  ) {
-
-                    return {
-                      ...exercise,
-                      sets: [
-                        ...exercise.sets,
-                        {
-                          weight: 0,
-                          reps: 0,
-                        },
-                      ],
-                    };
-                  }
-
-                  return exercise;
-                }
-              );
-
-            return {
-              ...item,
-              exercises:
-                updatedExercises,
-            };
+        const updatedExercises = item.exercises.map((exercise) => {
+          if (exercise.id !== exerciseId) {
+            return exercise;
           }
 
-          return item;
+          return {
+            ...exercise,
+            sets: [
+              ...exercise.sets,
+              {
+                weight: 0,
+                reps: 0,
+              },
+            ],
+          };
         });
 
-      await saveWorkouts(
-        updatedWorkouts
-      );
+        return {
+          ...item,
+          exercises: updatedExercises,
+        };
+      });
 
-      setWorkout(
-        findWorkoutById(
-          updatedWorkouts,
-          workoutId
-        )
-      );
-
+      await saveUpdatedWorkout(updatedWorkouts, workoutId);
     } catch (error) {
-
-      console.log(
-        "Error adding set",
-        error
-      );
+      console.log("Error adding set", error);
     }
   }
 
@@ -152,219 +98,142 @@ export function useWorkout() {
     exerciseId: string,
     setIndex: number,
     field: string,
-    value: number
+    value: number,
   ) {
-
     try {
+      const workouts = await loadWorkouts();
 
-      const workouts =
-        await loadWorkouts();
+      const updatedWorkouts = workouts.map((item) => {
+        if (item.id !== workoutId) {
+          return item;
+        }
 
-      const updatedWorkouts =
-        workouts.map((item) => {
-
-          if (
-            item.id === workoutId
-          ) {
-
-            const updatedExercises =
-              item.exercises.map(
-                (exercise) => {
-
-                  if (
-                    exercise.id ===
-                    exerciseId
-                  ) {
-
-                    const updatedSets =
-                      exercise.sets.map(
-                        (set, index) => {
-
-                          if (
-                            index === setIndex
-                          ) {
-
-                            return {
-                              ...set,
-                              [field]: value,
-                            };
-                          }
-
-                          return set;
-                        }
-                      );
-
-                    return {
-                      ...exercise,
-                      sets: updatedSets,
-                    };
-                  }
-
-                  return exercise;
-                }
-              );
-
-            return {
-              ...item,
-              exercises:
-                updatedExercises,
-            };
+        const updatedExercises = item.exercises.map((exercise) => {
+          if (exercise.id !== exerciseId) {
+            return exercise;
           }
 
-          return item;
+          const updatedSets = exercise.sets.map((set, index) => {
+            if (index !== setIndex) {
+              return set;
+            }
+
+            return {
+              ...set,
+              [field]: value,
+            };
+          });
+
+          return {
+            ...exercise,
+            sets: updatedSets,
+          };
         });
 
-      await saveWorkouts(
-        updatedWorkouts
-      );
+        return {
+          ...item,
+          exercises: updatedExercises,
+        };
+      });
 
-      setWorkout(
-        findWorkoutById(
-          updatedWorkouts,
-          workoutId
-        )
-      );
-
+      await saveUpdatedWorkout(updatedWorkouts, workoutId);
     } catch (error) {
-
-      console.log(
-        "Error updating set",
-        error
-      );
+      console.log("Error updating set", error);
     }
   }
 
   async function deleteSet(
     workoutId: string,
     exerciseId: string,
-    setIndex: number
+    setIndex: number,
   ) {
-
     try {
+      const workouts = await loadWorkouts();
 
-      const workouts =
-        await loadWorkouts();
+      const updatedWorkouts = workouts.map((item) => {
+        if (item.id !== workoutId) {
+          return item;
+        }
 
-      const updatedWorkouts =
-        workouts.map((item) => {
-
-          if (
-            item.id === workoutId
-          ) {
-
-            const updatedExercises =
-              item.exercises.map(
-                (exercise) => {
-
-                  if (
-                    exercise.id ===
-                    exerciseId
-                  ) {
-
-                    return {
-                      ...exercise,
-                      sets:
-                        exercise.sets.filter(
-                          (_, index) =>
-                            index !==
-                            setIndex
-                        ),
-                    };
-                  }
-
-                  return exercise;
-                }
-              );
-
-            return {
-              ...item,
-              exercises:
-                updatedExercises,
-            };
+        const updatedExercises = item.exercises.map((exercise) => {
+          if (exercise.id !== exerciseId) {
+            return exercise;
           }
 
-          return item;
+          return {
+            ...exercise,
+            sets: exercise.sets.filter((_, index) => index !== setIndex),
+          };
         });
 
-      await saveWorkouts(
-        updatedWorkouts
-      );
+        return {
+          ...item,
+          exercises: updatedExercises,
+        };
+      });
 
-      setWorkout(
-        findWorkoutById(
-          updatedWorkouts,
-          workoutId
-        )
-      );
-
+      await saveUpdatedWorkout(updatedWorkouts, workoutId);
     } catch (error) {
-
-      console.log(
-        "Error deleting set",
-        error
-      );
+      console.log("Error deleting set", error);
     }
   }
 
-  async function deleteExercise(
-    workoutId: string,
-    exerciseId: string
-  ) {
+  async function deleteExercise(workoutId: string, exerciseId: string) {
+    try {
+      const workouts = await loadWorkouts();
+
+      const updatedWorkouts = workouts.map((item) => {
+        if (item.id !== workoutId) {
+          return item;
+        }
+
+        return {
+          ...item,
+          exercises: item.exercises.filter(
+            (exercise) => exercise.id !== exerciseId,
+          ),
+        };
+      });
+
+      await saveUpdatedWorkout(updatedWorkouts, workoutId);
+    } catch (error) {
+      console.log("Error deleting exercise", error);
+    }
+  }
+
+  async function updateWorkoutName(workoutId: string, workoutName: string) {
+    const trimmedName = workoutName.trim();
+
+    if (trimmedName === "") {
+      return;
+    }
 
     try {
+      const workouts = await loadWorkouts();
 
-      const workouts =
-        await loadWorkouts();
-
-      const updatedWorkouts =
-        workouts.map((item) => {
-
-          if (
-            item.id === workoutId
-          ) {
-
-            return {
+      const updatedWorkouts = workouts.map((item) =>
+        item.id === workoutId
+          ? {
               ...item,
-              exercises:
-                item.exercises.filter(
-                  (exercise) =>
-                    exercise.id !==
-                    exerciseId
-                ),
-            };
-          }
-
-          return item;
-        });
-
-      await saveWorkouts(
-        updatedWorkouts
+              name: trimmedName,
+            }
+          : item,
       );
 
-      setWorkout(
-        findWorkoutById(
-          updatedWorkouts,
-          workoutId
-        )
-      );
-
+      await saveUpdatedWorkout(updatedWorkouts, workoutId);
     } catch (error) {
-
-      console.log(
-        "Error deleting exercise",
-        error
-      );
+      console.log("Error updating workout name", error);
     }
   }
 
   return {
     workout,
-    setWorkout,
     loadWorkoutById,
     addExercise,
     addSet,
     updateSet,
     deleteSet,
     deleteExercise,
+    updateWorkoutName,
   };
 }
