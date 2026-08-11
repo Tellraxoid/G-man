@@ -1,9 +1,11 @@
 export const Colors = {
-  background: "#111111",
-  card: "#222222",
-  text: "#FFFFFF",
-  cardSecondary: "#333333",
+  background: "#111",
+  card: "#222",
+  text: "#fff",
+  textSecondary: "#888",
   accent: "#22c55e",
-  textSecondary: "#888888",
-  danger: "#ef4444",
+  inputBackground: "#333",
+
+  deleteButton: "#dc2626",
+  addButton: "#22c55e",
 };

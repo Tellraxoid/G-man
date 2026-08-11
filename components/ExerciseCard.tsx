@@ -1,54 +1,125 @@
-import {
-  Text,
-  View,
-  TouchableOpacity,
-  TextInput,
-} from "react-native";
+import { Colors } from "@/constants/theme";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+
 import { calculateVolume } from "../utils/calculateVolume";
-import { getPR } from "../utils/prUtils";
+
+import EditableTitle from "./ui/EditableTitle";
+
+type HistoricalPR = {
+  weight: number;
+  reps: number;
+} | null;
+
+type ExerciseSet = {
+  weight: number;
+  reps: number;
+};
+
+type Exercise = {
+  id: string;
+  name: string;
+  sets: ExerciseSet[];
+};
+
+type ExerciseCardProps = {
+  exercise: Exercise;
+
+  onAddSet: (exerciseId: string) => void;
+
+  onUpdateSet: (
+    exerciseId: string,
+    setIndex: number,
+    field: "weight" | "reps",
+    value: number,
+  ) => void;
+
+  onDeleteSet: (exerciseId: string, setIndex: number) => void;
+
+  onDeleteExercise: (exerciseId: string) => void;
+
+  onUpdateExerciseName: (exerciseId: string, newName: string) => void;
+
+  historicalPR?: HistoricalPR;
+  previousPR?: HistoricalPR;
+};
+
 export default function ExerciseCard({
   exercise,
   onAddSet,
   onUpdateSet,
   onDeleteSet,
   onDeleteExercise,
-}) {
+  onUpdateExerciseName,
+  historicalPR,
+  previousPR,
+}: ExerciseCardProps) {
   const volume = calculateVolume(exercise.sets);
-      const pr = getPR(exercise.sets);
+  const currentBestWeight =
+    exercise.sets.length > 0
+      ? Math.max(...exercise.sets.map((set) => set.weight))
+      : 0;
+
+  const isNewPR =
+    currentBestWeight > 0 &&
+    (!previousPR || currentBestWeight > previousPR.weight);
   return (
-    
     <View
       style={{
         padding: 20,
-        backgroundColor: "#222",
+        backgroundColor: Colors.card,
         borderRadius: 15,
         marginBottom: 15,
       }}
     >
+      <EditableTitle
+        title={exercise.name}
+        onSave={(newName) => onUpdateExerciseName(exercise.id, newName)}
+      />
+
       <Text
         style={{
-          color: "white",
-          fontSize: 18,
-          fontWeight: "bold",
+          color: Colors.textSecondary,
+          fontSize: 14,
           marginBottom: 10,
         }}
       >
-        {exercise.name}
-      </Text>
-<Text style={{
-        color: "#888",
-        fontSize: 14,
-        marginBottom: 10,
-      }}>
         Volume: {volume} kg
       </Text>
-      <Text style={{
-        color: "#888",
-        fontSize: 14,
-        marginBottom: 10,
-      }}>
-        PR: {pr} kg
-      </Text>
+      {isNewPR && (
+        <Text
+          style={{
+            color: Colors.accent,
+            fontSize: 16,
+            fontWeight: "bold",
+            marginBottom: 10,
+          }}
+        >
+          🏆 NEW PR!
+        </Text>
+      )}
+      {historicalPR ? (
+        <Text
+          style={{
+            color: Colors.accent,
+            fontSize: 14,
+            fontWeight: "bold",
+            marginBottom: 10,
+          }}
+        >
+          🏆 Best Ever: {historicalPR.weight} kg × {historicalPR.reps}
+        </Text>
+      ) : (
+        <Text
+          style={{
+            color: Colors.textSecondary,
+            fontSize: 14,
+            marginBottom: 10,
+          }}
+        >
+          No PR yet
+        </Text>
+      )}
+
       {exercise.sets.map((set, index) => (
         <View
           key={index}
@@ -61,19 +132,14 @@ export default function ExerciseCard({
           <TextInput
             value={set.weight.toString()}
             onChangeText={(text) =>
-              onUpdateSet(
-                exercise.id,
-                index,
-                "weight",
-                Number(text) || 0
-              )
+              onUpdateSet(exercise.id, index, "weight", Number(text) || 0)
             }
             placeholder="Weight"
-            placeholderTextColor="#888"
+            placeholderTextColor={Colors.textSecondary}
             keyboardType="numeric"
             style={{
-              backgroundColor: "#333",
-              color: "white",
+              backgroundColor: Colors.background,
+              color: Colors.text,
               padding: 10,
               borderRadius: 10,
               flex: 1,
@@ -84,19 +150,14 @@ export default function ExerciseCard({
           <TextInput
             value={set.reps.toString()}
             onChangeText={(text) =>
-              onUpdateSet(
-                exercise.id,
-                index,
-                "reps",
-                Number(text) || 0
-              )
+              onUpdateSet(exercise.id, index, "reps", Number(text) || 0)
             }
             placeholder="Reps"
-            placeholderTextColor="#888"
+            placeholderTextColor={Colors.textSecondary}
             keyboardType="numeric"
             style={{
-              backgroundColor: "#333",
-              color: "white",
+              backgroundColor: Colors.background,
+              color: Colors.text,
               padding: 10,
               borderRadius: 10,
               flex: 1,
@@ -105,14 +166,9 @@ export default function ExerciseCard({
           />
 
           <TouchableOpacity
-            onPress={() =>
-              onDeleteSet(
-                exercise.id,
-                index
-              )
-            }
+            onPress={() => onDeleteSet(exercise.id, index)}
             style={{
-              backgroundColor: "red",
+              backgroundColor: Colors.deleteButton,
               paddingHorizontal: 12,
               borderRadius: 10,
               justifyContent: "center",
@@ -120,7 +176,7 @@ export default function ExerciseCard({
           >
             <Text
               style={{
-                color: "white",
+                color: Colors.text,
                 fontWeight: "bold",
               }}
             >
@@ -131,29 +187,9 @@ export default function ExerciseCard({
       ))}
 
       <TouchableOpacity
-        onPress={() => onDeleteExercise(exercise.id)}
-        style={{
-          backgroundColor: "red",
-          paddingHorizontal: 12,
-          borderRadius: 10,
-          marginTop: 15,
-          alignItems: "center",
-        }}
-      >
-        <Text
-          style={{
-            color: "white",
-            fontWeight: "bold",
-          }}
-        >
-          Delete Exercise
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
         onPress={() => onAddSet(exercise.id)}
         style={{
-          backgroundColor: "#444",
+          backgroundColor: Colors.addButton,
           padding: 12,
           borderRadius: 12,
           marginTop: 15,
@@ -162,11 +198,31 @@ export default function ExerciseCard({
       >
         <Text
           style={{
-            color: "white",
+            color: Colors.text,
             fontWeight: "bold",
           }}
         >
           + Add Set
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => onDeleteExercise(exercise.id)}
+        style={{
+          backgroundColor: Colors.deleteButton,
+          padding: 12,
+          borderRadius: 10,
+          marginTop: 15,
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            color: Colors.text,
+            fontWeight: "bold",
+          }}
+        >
+          Delete Exercise
         </Text>
       </TouchableOpacity>
     </View>

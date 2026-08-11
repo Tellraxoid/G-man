@@ -200,7 +200,45 @@ export function useWorkout() {
       console.log("Error deleting exercise", error);
     }
   }
+  async function updateExerciseName(
+    workoutId: string,
+    exerciseId: string,
+    exerciseName: string,
+  ) {
+    const trimmedName = exerciseName.trim();
 
+    if (trimmedName === "") {
+      return;
+    }
+
+    try {
+      const workouts = await loadWorkouts();
+
+      const updatedWorkouts = workouts.map((item) => {
+        if (item.id !== workoutId) {
+          return item;
+        }
+
+        const updatedExercises = item.exercises.map((exercise) =>
+          exercise.id === exerciseId
+            ? {
+                ...exercise,
+                name: trimmedName,
+              }
+            : exercise,
+        );
+
+        return {
+          ...item,
+          exercises: updatedExercises,
+        };
+      });
+
+      await saveUpdatedWorkout(updatedWorkouts, workoutId);
+    } catch (error) {
+      console.log("Error updating exercise name", error);
+    }
+  }
   async function updateWorkoutName(workoutId: string, workoutName: string) {
     const trimmedName = workoutName.trim();
 
@@ -235,5 +273,6 @@ export function useWorkout() {
     deleteSet,
     deleteExercise,
     updateWorkoutName,
+    updateExerciseName,
   };
 }

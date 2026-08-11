@@ -16,7 +16,10 @@ import AppInput from "../components/ui/AppInput";
 import EditableTitle from "../components/ui/EditableTitle";
 import { Colors } from "../constants/theme";
 import { useWorkout } from "../hooks/useWorkout";
+import { loadWorkouts } from "../storage/workoutStorage";
+import { Workout } from "../types/workout";
 import { calculateVolume } from "../utils/calculateVolume";
+import { getExercisePR } from "../utils/exerciseStats";
 
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,7 +33,10 @@ export default function WorkoutScreen() {
     deleteSet,
     deleteExercise,
     updateWorkoutName,
+    updateExerciseName,
   } = useWorkout();
+
+  const [workoutHistory, setWorkoutHistory] = useState<Workout[]>([]);
 
   const [exerciseName, setExerciseName] = useState("");
 
@@ -39,6 +45,15 @@ export default function WorkoutScreen() {
       loadWorkoutById(id);
     }
   }, [id]);
+
+  useEffect(() => {
+    async function loadHistory() {
+      const data = await loadWorkouts();
+      setWorkoutHistory(data || []);
+    }
+
+    loadHistory();
+  }, [workout]);
 
   function handleAddExercise() {
     const trimmedName = exerciseName.trim();
@@ -83,6 +98,10 @@ export default function WorkoutScreen() {
   const totalSets = workout.exercises.reduce(
     (total, exercise) => total + exercise.sets.length,
     0,
+  );
+
+  const previousWorkouts = workoutHistory.filter(
+    (item) => item.id !== workout.id,
   );
 
   return (
@@ -202,20 +221,31 @@ export default function WorkoutScreen() {
           }}
         />
 
-        {workout.exercises.map((exercise) => (
-          <ExerciseCard
-            key={exercise.id}
-            exercise={exercise}
-            onAddSet={(exerciseId) => addSet(id, exerciseId)}
-            onUpdateSet={(exerciseId, setIndex, field, value) =>
-              updateSet(id, exerciseId, setIndex, field, value)
-            }
-            onDeleteSet={(exerciseId, setIndex) =>
-              deleteSet(id, exerciseId, setIndex)
-            }
-            onDeleteExercise={(exerciseId) => deleteExercise(id, exerciseId)}
-          />
-        ))}
+        {workout.exercises.map((exercise) => {
+          const historicalPR = getExercisePR(workoutHistory, exercise.name);
+
+          const previousPR = getExercisePR(previousWorkouts, exercise.name);
+
+          return (
+            <ExerciseCard
+              key={exercise.id}
+              exercise={exercise}
+              historicalPR={historicalPR}
+              previousPR={previousPR}
+              onAddSet={(exerciseId) => addSet(id, exerciseId)}
+              onUpdateSet={(exerciseId, setIndex, field, value) =>
+                updateSet(id, exerciseId, setIndex, field, value)
+              }
+              onDeleteSet={(exerciseId, setIndex) =>
+                deleteSet(id, exerciseId, setIndex)
+              }
+              onDeleteExercise={(exerciseId) => deleteExercise(id, exerciseId)}
+              onUpdateExerciseName={(exerciseId, newName) =>
+                updateExerciseName(id, exerciseId, newName)
+              }
+            />
+          );
+        })}
       </ScrollView>
     </KeyboardAvoidingView>
   );
