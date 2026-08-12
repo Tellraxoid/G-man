@@ -1,10 +1,13 @@
 import { useLocalSearchParams } from "expo-router";
 import React from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Dimensions, ScrollView, Text, View } from "react-native";
+
+import { LineChart } from "react-native-chart-kit";
 
 import InfoCard from "../../components/InfoCard";
 import { exercisesDatabase } from "../../data/exerciseDatabase";
 import { loadWorkouts } from "../../storage/workoutStorage";
+
 import {
   getBestSet,
   getExerciseHistory,
@@ -54,6 +57,32 @@ export default function ExerciseScreen() {
   const [bestSet, setBestSet] = React.useState<ExerciseSet | null>(null);
 
   const [history, setHistory] = React.useState<ExerciseHistoryItem[]>([]);
+
+  const screenWidth = Dimensions.get("window").width;
+
+  const progress = history
+    .filter(
+      (item) =>
+        item.bestSet !== null &&
+        item.bestSet.weight > 0 &&
+        item.bestSet.reps > 0,
+    )
+    .map((item) => ({
+      date: item.date,
+      weight: item.bestSet!.weight,
+      reps: item.bestSet!.reps,
+    }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const filteredHistory = history
+    .filter(
+      (item) =>
+        item.bestSet !== null &&
+        item.bestSet.weight > 0 &&
+        item.bestSet.reps > 0,
+    )
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   React.useEffect(() => {
     async function loadStats() {
@@ -276,7 +305,7 @@ export default function ExerciseScreen() {
         </View>
       )}
 
-      {history.length > 0 && (
+      {progress.length >= 2 && (
         <View
           style={{
             backgroundColor: "#222",
@@ -293,57 +322,107 @@ export default function ExerciseScreen() {
               marginBottom: 15,
             }}
           >
-            📈 History
+            📈 Progress
           </Text>
 
-          {history
-            .slice()
-            .sort(
-              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-            )
-            .map((item) => (
-              <View
-                key={item.workoutId}
+          <LineChart
+            data={{
+              labels: progress.map((item) =>
+                new Date(item.date).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                }),
+              ),
+
+              datasets: [
+                {
+                  data: progress.map((item) => item.weight),
+                },
+              ],
+            }}
+            width={screenWidth - 100}
+            height={220}
+            yAxisSuffix=" kg"
+            chartConfig={{
+              backgroundGradientFrom: "#222",
+              backgroundGradientTo: "#222",
+
+              decimalPlaces: 1,
+
+              color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
+
+              labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+
+              propsForDots: {
+                r: "5",
+              },
+
+              propsForBackgroundLines: {
+                stroke: "#444",
+              },
+            }}
+            bezier
+            style={{
+              borderRadius: 15,
+            }}
+          />
+        </View>
+      )}
+
+      {filteredHistory.length > 0 && (
+        <View
+          style={{
+            backgroundColor: "#222",
+            padding: 20,
+            borderRadius: 15,
+            marginTop: 15,
+          }}
+        >
+          <Text
+            style={{
+              color: "#22c55e",
+              fontSize: 16,
+              fontWeight: "bold",
+              marginBottom: 15,
+            }}
+          >
+            📚 History
+          </Text>
+
+          {filteredHistory.map((item) => (
+            <View
+              key={item.workoutId}
+              style={{
+                marginBottom: 15,
+              }}
+            >
+              <Text
                 style={{
-                  marginBottom: 15,
+                  color: "white",
+                  fontSize: 16,
+                  fontWeight: "bold",
+                  marginBottom: 4,
                 }}
               >
+                {new Date(item.date).toLocaleDateString("en-US", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </Text>
+
+              {item.bestSet && (
                 <Text
                   style={{
-                    color: "white",
-                    fontSize: 16,
-                    fontWeight: "bold",
-                    marginBottom: 4,
+                    color: "#888",
+                    fontSize: 14,
                   }}
                 >
-                  {new Date(item.date).toLocaleDateString("en-US", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  Best: {item.bestSet.weight} kg × {item.bestSet.reps}
                 </Text>
-
-                {item.bestSet ? (
-                  <Text
-                    style={{
-                      color: "#888",
-                      fontSize: 14,
-                    }}
-                  >
-                    Best: {item.bestSet.weight} kg × {item.bestSet.reps}
-                  </Text>
-                ) : (
-                  <Text
-                    style={{
-                      color: "#888",
-                      fontSize: 14,
-                    }}
-                  >
-                    No sets
-                  </Text>
-                )}
-              </View>
-            ))}
+              )}
+            </View>
+          ))}
         </View>
       )}
     </ScrollView>

@@ -89,3 +89,16 @@ export function getExerciseHistory(workouts: any[], exerciseName: string) {
     })
     .filter(Boolean);
 }
+export function getExerciseProgress(workouts: any[], exerciseName: string) {
+  return getExerciseHistory(workouts, exerciseName)
+    .filter((item: any) => item.bestSet)
+    .map((item: any) => ({
+      date: item.date,
+      weight: item.bestSet.weight,
+      reps: item.bestSet.reps,
+    }))
+    .sort(
+      (a: any, b: any) =>
+        new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+}
