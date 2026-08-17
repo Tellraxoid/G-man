@@ -1,6 +1,5 @@
-import { Text, TouchableOpacity, View } from "react-native";
-
 import { router } from "expo-router";
+import { Text, TouchableOpacity, View } from "react-native";
 
 import { Colors } from "../constants/theme";
 import { Workout } from "../types/workout";
@@ -17,6 +16,23 @@ export default function WorkoutCard({ workout, onDelete }: WorkoutCardProps) {
     day: "numeric",
     year: "numeric",
   });
+
+  const totalExercises = workout.exercises.length;
+
+  const totalSets = workout.exercises.reduce(
+    (total, exercise) => total + exercise.sets.length,
+    0,
+  );
+
+  const totalVolume = workout.exercises.reduce(
+    (total, exercise) =>
+      total +
+      exercise.sets.reduce(
+        (exerciseTotal, set) => exerciseTotal + set.weight * set.reps,
+        0,
+      ),
+    0,
+  );
 
   function openWorkout() {
     router.push({
@@ -74,7 +90,18 @@ export default function WorkoutCard({ workout, onDelete }: WorkoutCardProps) {
               marginTop: 5,
             }}
           >
-            Total Exercises: {workout.exercises.length}
+            {totalExercises} exercises · {totalSets} sets
+          </Text>
+
+          <Text
+            style={{
+              color: Colors.accent,
+              fontSize: 14,
+              fontWeight: "bold",
+              marginTop: 5,
+            }}
+          >
+            Volume: {totalVolume} kg
           </Text>
         </View>
       </TouchableOpacity>
@@ -82,7 +109,7 @@ export default function WorkoutCard({ workout, onDelete }: WorkoutCardProps) {
       <TouchableOpacity
         onPress={handleDelete}
         style={{
-          backgroundColor: Colors.danger,
+          backgroundColor: Colors.deleteButton,
           paddingHorizontal: 12,
           paddingVertical: 8,
           borderRadius: 10,

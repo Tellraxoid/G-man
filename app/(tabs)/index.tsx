@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
+
 import WorkoutCard from "../../components/WorkoutCard";
 import AppButton from "../../components/ui/AppButton";
 import AppHeader from "../../components/ui/AppHeader";
@@ -47,6 +48,93 @@ export default function Index() {
     setWorkouts(updatedWorkouts);
   }
 
+  function getWeekStart(date: Date) {
+    const result = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
+
+    const day = result.getDay();
+    const daysFromMonday = day === 0 ? 6 : day - 1;
+
+    result.setDate(result.getDate() - daysFromMonday);
+
+    return result.getTime();
+  }
+
+  function getWeeklyAverage() {
+    if (workouts.length === 0) {
+      return 0;
+    }
+
+    const weeklyCounts = new Map<number, number>();
+
+    workouts.forEach((workout) => {
+      const weekStart = getWeekStart(new Date(workout.date));
+
+      weeklyCounts.set(weekStart, (weeklyCounts.get(weekStart) ?? 0) + 1);
+    });
+
+    const counts = Array.from(weeklyCounts.values());
+
+    const total = counts.reduce((sum, count) => sum + count, 0);
+
+    return total / counts.length;
+  }
+
+  function getTrainingStreak() {
+    if (workouts.length === 0) {
+      return 0;
+    }
+
+    const uniqueWeeks = Array.from(
+      new Set(workouts.map((workout) => getWeekStart(new Date(workout.date)))),
+    ).sort((a, b) => b - a);
+
+    if (uniqueWeeks.length === 0) {
+      return 0;
+    }
+
+    const currentWeek = getWeekStart(new Date());
+    const latestWorkoutWeek = uniqueWeeks[0];
+
+    const oneWeek = 7 * 24 * 60 * 60 * 1000;
+
+    if (
+      latestWorkoutWeek !== currentWeek &&
+      latestWorkoutWeek !== currentWeek - oneWeek
+    ) {
+      return 0;
+    }
+
+    let streak = 1;
+
+    for (let i = 0; i < uniqueWeeks.length - 1; i++) {
+      const difference = (uniqueWeeks[i] - uniqueWeeks[i + 1]) / oneWeek;
+
+      if (difference === 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  function getThisWeekWorkouts() {
+    const currentWeek = getWeekStart(new Date());
+
+    return workouts.filter(
+      (workout) => getWeekStart(new Date(workout.date)) === currentWeek,
+    ).length;
+  }
+
+  const trainingStreak = getTrainingStreak();
+  const thisWeekWorkouts = getThisWeekWorkouts();
+  const weeklyAverage = getWeeklyAverage();
+
   return (
     <View
       style={{
@@ -60,6 +148,114 @@ export default function Index() {
         title="Gym Diary"
         subtitle={`Total workouts: ${workouts.length}`}
       />
+
+      {/* Statistics */}
+
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 10,
+          marginBottom: 20,
+        }}
+      >
+        {/* Streak */}
+
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: Colors.card,
+            padding: 15,
+            borderRadius: 15,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors.accent,
+              fontSize: 13,
+              fontWeight: "bold",
+              marginBottom: 8,
+            }}
+          >
+            🔥 Streak
+          </Text>
+
+          <Text
+            style={{
+              color: Colors.text,
+              fontSize: 23,
+              fontWeight: "bold",
+            }}
+          >
+            {trainingStreak}w
+          </Text>
+        </View>
+
+        {/* This Week */}
+
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: Colors.card,
+            padding: 15,
+            borderRadius: 15,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors.accent,
+              fontSize: 13,
+              fontWeight: "bold",
+              marginBottom: 8,
+            }}
+          >
+            🏋️ This Week
+          </Text>
+
+          <Text
+            style={{
+              color: Colors.text,
+              fontSize: 23,
+              fontWeight: "bold",
+            }}
+          >
+            {thisWeekWorkouts}
+          </Text>
+        </View>
+
+        {/* Weekly Average */}
+
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: Colors.card,
+            padding: 15,
+            borderRadius: 15,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors.accent,
+              fontSize: 13,
+              fontWeight: "bold",
+              marginBottom: 8,
+            }}
+          >
+            📊 Avg / Week
+          </Text>
+
+          <Text
+            style={{
+              color: Colors.text,
+              fontSize: 23,
+              fontWeight: "bold",
+            }}
+          >
+            {weeklyAverage.toFixed(1)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Add Workout */}
 
       <AppInput
         value={newWorkout}
@@ -83,6 +279,8 @@ export default function Index() {
           fontWeight: "bold",
         }}
       />
+
+      {/* Workout List */}
 
       {workouts.map((workout, index) => (
         <WorkoutCard
