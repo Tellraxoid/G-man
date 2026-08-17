@@ -102,3 +102,32 @@ export function getExerciseProgress(workouts: any[], exerciseName: string) {
         new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
 }
+export function getPreviousWorkout(
+  workouts: any[],
+  exerciseName: string,
+  currentWorkoutId: string,
+) {
+  const currentWorkout = workouts.find(
+    (workout) => workout.id === currentWorkoutId,
+  );
+
+  if (!currentWorkout) {
+    return null;
+  }
+
+  const currentWorkoutDate = new Date(currentWorkout.date).getTime();
+
+  return (
+    getExerciseHistory(workouts, exerciseName)
+      .filter(
+        (item: any) =>
+          item.workoutId !== currentWorkoutId &&
+          new Date(item.date).getTime() < currentWorkoutDate &&
+          item.sets?.some((set: any) => set.weight > 0 && set.reps > 0),
+      )
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime(),
+      )[0] ?? null
+  );
+}

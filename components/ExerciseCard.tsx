@@ -10,6 +10,11 @@ type HistoricalPR = {
   reps: number;
 } | null;
 
+type PreviousWorkout = {
+  date: string;
+  sets: ExerciseSet[];
+} | null;
+
 type ExerciseSet = {
   weight: number;
   reps: number;
@@ -41,6 +46,7 @@ type ExerciseCardProps = {
 
   historicalPR?: HistoricalPR;
   previousPR?: HistoricalPR;
+  previousWorkout?: PreviousWorkout;
 };
 
 export default function ExerciseCard({
@@ -52,6 +58,7 @@ export default function ExerciseCard({
   onUpdateExerciseName,
   historicalPR,
   previousPR,
+  previousWorkout,
 }: ExerciseCardProps) {
   const volume = calculateVolume(exercise.sets);
   const currentBestWeight =
@@ -96,6 +103,52 @@ export default function ExerciseCard({
         >
           🏆 NEW PR!
         </Text>
+      )}
+      {previousWorkout && (
+        <View
+          style={{
+            backgroundColor: Colors.background,
+            padding: 12,
+            borderRadius: 10,
+            marginBottom: 10,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors.textSecondary,
+              fontSize: 13,
+              marginBottom: 6,
+            }}
+          >
+            Previous Workout
+          </Text>
+
+          <Text
+            style={{
+              color: Colors.text,
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            {new Date(previousWorkout.date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}
+          </Text>
+
+          {previousWorkout.sets.map((set, index) => (
+            <Text
+              key={index}
+              style={{
+                color: Colors.textSecondary,
+                fontSize: 14,
+                marginBottom: 3,
+              }}
+            >
+              Set {index + 1}: {set.weight} kg × {set.reps}
+            </Text>
+          ))}
+        </View>
       )}
       {historicalPR ? (
         <Text

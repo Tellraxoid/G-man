@@ -19,7 +19,7 @@ import { useWorkout } from "../hooks/useWorkout";
 import { loadWorkouts } from "../storage/workoutStorage";
 import { Workout } from "../types/workout";
 import { calculateVolume } from "../utils/calculateVolume";
-import { getExercisePR } from "../utils/exerciseStats";
+import { getExercisePR, getPreviousWorkout } from "../utils/exerciseStats";
 
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -226,11 +226,18 @@ export default function WorkoutScreen() {
 
           const previousPR = getExercisePR(previousWorkouts, exercise.name);
 
+          const previousWorkout = getPreviousWorkout(
+            workoutHistory,
+            exercise.name,
+            workout.id,
+          );
+
           return (
             <ExerciseCard
               key={exercise.id}
               exercise={exercise}
               historicalPR={historicalPR}
+              previousWorkout={previousWorkout}
               previousPR={previousPR}
               onAddSet={(exerciseId) => addSet(id, exerciseId)}
               onUpdateSet={(exerciseId, setIndex, field, value) =>
