@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
+import { router } from "expo-router";
 import AppCard from "../../components/ui/AppCard";
 import { Colors } from "../../constants/theme";
 import { loadWorkouts } from "../../storage/workoutStorage";
@@ -266,66 +267,79 @@ export default function CalendarScreen() {
           }}
         >
           {selectedWorkouts.map((selectedWorkout) => (
-            <AppCard key={selectedWorkout.id}>
-              <Text
-                style={{
-                  color: Colors.accent,
-                  fontSize: 20,
-                  fontWeight: "bold",
-                  marginBottom: 5,
-                }}
-              >
-                🏋️ {selectedWorkout.name}
-              </Text>
+            <TouchableOpacity
+              key={selectedWorkout.id}
+              activeOpacity={0.7}
+              onPress={() => {
+                router.push({
+                  pathname: "/workout",
+                  params: {
+                    id: selectedWorkout.id,
+                  },
+                });
+              }}
+            >
+              <AppCard>
+                <Text
+                  style={{
+                    color: Colors.accent,
+                    fontSize: 20,
+                    fontWeight: "bold",
+                    marginBottom: 5,
+                  }}
+                >
+                  🏋️ {selectedWorkout.name}
+                </Text>
 
-              <Text
-                style={{
-                  color: Colors.textSecondary,
-                  fontSize: 14,
-                  marginBottom: 15,
-                }}
-              >
-                {new Date(selectedWorkout.date).toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </Text>
-
-              <Text
-                style={{
-                  color: Colors.text,
-                  fontSize: 16,
-                  fontWeight: "bold",
-                  marginBottom: 10,
-                }}
-              >
-                Exercises
-              </Text>
-
-              {selectedWorkout.exercises.length === 0 ? (
                 <Text
                   style={{
                     color: Colors.textSecondary,
                     fontSize: 14,
+                    marginBottom: 15,
                   }}
                 >
-                  No exercises for this workout
+                  {new Date(selectedWorkout.date).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </Text>
-              ) : (
-                selectedWorkout.exercises.map((exercise) => (
+
+                <Text
+                  style={{
+                    color: Colors.text,
+                    fontSize: 16,
+                    fontWeight: "bold",
+                    marginBottom: 10,
+                  }}
+                >
+                  Exercises
+                </Text>
+
+                {selectedWorkout.exercises.length === 0 ? (
                   <Text
-                    key={exercise.id}
                     style={{
                       color: Colors.textSecondary,
                       fontSize: 14,
-                      marginBottom: 6,
                     }}
                   >
-                    • {exercise.name}
+                    No exercises for this workout
                   </Text>
-                ))
-              )}
-            </AppCard>
+                ) : (
+                  selectedWorkout.exercises.map((exercise) => (
+                    <Text
+                      key={exercise.id}
+                      style={{
+                        color: Colors.textSecondary,
+                        fontSize: 14,
+                        marginBottom: 6,
+                      }}
+                    >
+                      • {exercise.name}
+                    </Text>
+                  ))
+                )}
+              </AppCard>
+            </TouchableOpacity>
           ))}
         </View>
       )}
