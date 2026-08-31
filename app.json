@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "gym-diary",
-    "slug": "gym-diary",
+    "name": "S.T.E.M. Training",
+    "slug": "stem-training",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "gymdiary",
+    "scheme": "stemtraining",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -16,7 +16,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.gymdiary"
+      "package": "com.stem.training"
     },
     "web": {
       "output": "static",
