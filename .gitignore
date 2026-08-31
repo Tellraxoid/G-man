@@ -38,6 +38,5 @@ yarn-error.*
 
 app-example
 
-# generated native folders
+# iOS native project is not needed for this Android-first module
 /ios
-/android
