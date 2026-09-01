@@ -14,8 +14,8 @@ android {
         applicationId = "com.stem.stemtraining"
         minSdk = 26
         targetSdk = 37
-        versionCode = 18
-        versionName = "1.2.6-beta"
+        versionCode = 19
+        versionName = "1.3.0-beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

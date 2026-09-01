@@ -1,4 +1,4 @@
-# S.T.E.M. Training 1.2.6 Beta
+# S.T.E.M. Training 1.3.0 Beta
 
 The first installable beta of the complete gym diary.
 
@@ -18,6 +18,8 @@ The first installable beta of the complete gym diary.
 - Added preacher curls, hanging leg raises, and parallel-bar dips with dedicated illustrations.
 - Added compact exercise illustrations to program preview and editing screens.
 - Added decline-bench crunches and parallel-bar leg raises with dedicated abdominal exercise illustrations.
+- Add completed workouts on any of the last 30 calendar days and fully edit their exercises and sets.
+- New S.T.E.M. Training header emblem and the motto “Sic Parvis Magna”.
 - Portable JSON backup and restore.
 - New S.T.E.M. visual identity, onboarding, launcher icon, and splash screen.
 
