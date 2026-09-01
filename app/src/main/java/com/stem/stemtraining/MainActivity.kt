@@ -43,7 +43,7 @@ private enum class Page(val title: String) { TRAINING("Тренировка"), H
     val context = LocalContext.current
     val dao = remember { TrainingDatabase.getInstance(context).trainingDao() }
     val scope = rememberCoroutineScope()
-    var page by remember { mutableStateOf(Page.TRAINING) }
+    var page by remember { mutableStateOf(Page.TRAINING) }; val prefs=remember{context.getSharedPreferences("stem_settings",0)};var onboarding by remember{mutableStateOf(!prefs.getBoolean("onboarding_done",false))}
     LaunchedEffect(Unit) { seedPrograms(dao) }
     Scaffold(containerColor = MaterialTheme.colorScheme.background, bottomBar = { NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) { Page.entries.forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = { Icon(when(item){Page.TRAINING->Icons.Rounded.FitnessCenter;Page.HISTORY->Icons.Rounded.CalendarMonth;Page.PROGRAMS->Icons.Rounded.ViewList;Page.STATS->Icons.Rounded.ShowChart;Page.SETTINGS->Icons.Rounded.Settings}, item.title) }, label = { Text(item.title, maxLines = 1) }, colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)) } } }) { padding ->
         Box(Modifier.padding(padding)) {
@@ -56,6 +56,7 @@ private enum class Page(val title: String) { TRAINING("Тренировка"), H
             }
         }
     }
+    if(onboarding)AlertDialog(onDismissRequest={},icon={Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.primaryContainer){Icon(Icons.Rounded.FitnessCenter,null,Modifier.padding(16.dp).size(34.dp))}},title={Text("Добро пожаловать в S.T.E.M.")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){Text("1. Выберите программу или начните свободную тренировку.");Text("2. Записывайте подходы — таймер отдыха запустится автоматически.");Text("3. Следите за рекордами, недельной целью и прогрессом.");Text("Все данные хранятся на устройстве. Экспорт доступен в Настройках.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}},confirmButton={Button({prefs.edit().putBoolean("onboarding_done",true).apply();onboarding=false}){Text("Начать")}})
 }
 
 private suspend fun seedPrograms(dao: TrainingDao) {

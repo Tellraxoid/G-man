@@ -1,0 +1,26 @@
+name: Android release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Build and test
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest assembleRelease
+      - name: Name installable
+        run: cp app/build/outputs/apk/release/app-release.apk STEM-Training-${{ github.ref_name }}.apk
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" "STEM-Training-${{ github.ref_name }}.apk" --title "S.T.E.M. Training ${{ github.ref_name }}" --notes-file RELEASE_NOTES.md --prerelease

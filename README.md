@@ -1,5 +1,17 @@
 # S.T.E.M. Training
 
-Native Android application rebuilt from scratch with Kotlin and Jetpack Compose.
+Native Android gym diary built with Kotlin, Jetpack Compose, Material 3, and Room.
 
-Package: `com.stem.training`
+![Active workout](docs/screenshots/training.png)
+
+## Install
+
+Open [GitHub Releases](https://github.com/Tellraxoid/G-man/releases), download the attached `STEM-Training-*.apk`, and open it on Android. Allow installation from your browser or file manager when prompted.
+
+## Build and test
+
+```powershell
+.\gradlew.bat testDebugUnitTest assembleDebug
+```
+
+Package: `com.stem.stemtraining`
