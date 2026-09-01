@@ -14,8 +14,9 @@ import com.stem.stemtraining.data.TrainingDatabase
 import java.util.Locale
 
 @Composable
-fun StatisticsScreen(onBack: () -> Unit) {
-    val dao = remember { TrainingDatabase.getInstance(LocalContext.current).trainingDao() }
+fun StatisticsScreen() {
+    val context = LocalContext.current
+    val dao = remember { TrainingDatabase.getInstance(context).trainingDao() }
     val progress by dao.observeExerciseProgress().collectAsState(initial = emptyList())
     val workouts by dao.observeCompletedWorkouts().collectAsState(initial = emptyList())
     val summaries by dao.observeCompletedSummaries().collectAsState(initial = emptyList())
@@ -23,7 +24,7 @@ fun StatisticsScreen(onBack: () -> Unit) {
     val totalSets = summaries.sumOf { it.setCount }
 
     LazyColumn(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("S.T.E.M. ANALYTICS", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge); Text("Статистика", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }; TextButton(onClick = onBack) { Text("Сегодня") } } }
+        item { Spacer(Modifier.height(12.dp)); Column { Text("S.T.E.M. ANALYTICS", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge); Text("Прогресс", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) } }
         item { Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) { StatValue(workouts.size.toString(), "тренировок"); StatValue(totalSets.toString(), "подходов"); StatValue(formatStat(totalVolume), "кг объёма") } } }
         item { Text("Личные результаты", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("Расчётный 1ПМ — формула Epley по сохранённым рабочим подходам.", style = MaterialTheme.typography.bodySmall) }
         if (progress.isEmpty()) item { Text("Заверши несколько тренировок — здесь появятся результаты.") }
