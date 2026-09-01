@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.stem.stemtraining.data.ExerciseEntity
 import com.stem.stemtraining.data.TrainingDatabase
+import com.stem.stemtraining.data.WorkoutEntity
 import com.stem.stemtraining.data.WorkoutSetEntity
 import com.stem.stemtraining.ui.theme.STEMTrainingTheme
 import kotlinx.coroutines.launch
@@ -93,12 +94,17 @@ private val exerciseCatalog = listOf(
 fun TrainingScreen() {
     val context = LocalContext.current
     val dao = remember { TrainingDatabase.getInstance(context).trainingDao() }
-    val exercises by dao.observeExercises().collectAsState(initial = emptyList())
-    val allSets by dao.observeSets().collectAsState(initial = emptyList())
+    val activeWorkout by dao.observeActiveWorkout().collectAsState(initial = null)
+    val completedWorkouts by dao.observeCompletedWorkouts().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+
+    val workoutId = activeWorkout?.id ?: -1L
+    val exercises by remember(workoutId) { dao.observeExercises(workoutId) }.collectAsState(initial = emptyList())
+    val allSets by remember(workoutId) { dao.observeSets(workoutId) }.collectAsState(initial = emptyList())
 
     var showCatalog by remember { mutableStateOf(false) }
     var addingSetFor by remember { mutableStateOf<ExerciseEntity?>(null) }
+    var confirmFinish by remember { mutableStateOf(false) }
 
     val setCount = allSets.size
     val volume = allSets.sumOf { it.weight * it.reps }
@@ -110,48 +116,87 @@ fun TrainingScreen() {
         ) {
             item {
                 Spacer(Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Column {
                         Text("S.T.E.M. TRAINING", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("Сегодня", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(if (activeWorkout == null) "Сегодня" else "Тренировка идёт", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     }
                     Text("⋮", style = MaterialTheme.typography.headlineMedium)
                 }
                 Spacer(Modifier.height(16.dp))
-                WorkoutSummary(exercises.size, setCount, volume)
             }
 
-            if (exercises.isEmpty()) {
+            if (activeWorkout == null) {
                 item {
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                        Column(modifier = Modifier.padding(20.dp)) {
-                            Text("Тренировка пока пустая", fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(6.dp))
-                            Text("Выбери упражнение из каталога и начни записывать подходы.")
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Нет активной тренировки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Начни новую тренировку. После завершения она сохранится отдельно и больше не смешается со следующей.")
+                            if (completedWorkouts.isNotEmpty()) {
+                                Text("Завершённых тренировок: ${completedWorkouts.size}", color = MaterialTheme.colorScheme.primary)
+                            }
+                            Button(
+                                onClick = { scope.launch { dao.insertWorkout(WorkoutEntity()) } },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Начать тренировку")
+                            }
                         }
                     }
                 }
-            }
+            } else {
+                item { WorkoutSummary(exercises.size, setCount, volume) }
 
-            items(exercises, key = { it.id }) { exercise ->
-                ExerciseCard(exercise, allSets.filter { it.exerciseId == exercise.id }) { addingSetFor = exercise }
-            }
-
-            item {
-                Button(onClick = { showCatalog = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                    Text("+  Добавить упражнение")
+                if (exercises.isEmpty()) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Text("Тренировка пока пустая", fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(6.dp))
+                                Text("Выбери упражнение из каталога и начни записывать подходы.")
+                            }
+                        }
+                    }
                 }
-                Spacer(Modifier.height(24.dp))
+
+                items(exercises, key = { it.id }) { exercise ->
+                    ExerciseCard(exercise, allSets.filter { it.exerciseId == exercise.id }) { addingSetFor = exercise }
+                }
+
+                item {
+                    Button(onClick = { showCatalog = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("+  Добавить упражнение")
+                    }
+                    TextButton(onClick = { confirmFinish = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Завершить тренировку")
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
             }
         }
     }
 
-    if (showCatalog) {
+    if (showCatalog && activeWorkout != null) {
         ExerciseCatalogDialog(
             existingNames = exercises.map { it.name }.toSet(),
             onDismiss = { showCatalog = false },
             onSelect = { name ->
-                scope.launch { dao.insertExercise(ExerciseEntity(name = name)) }
+                scope.launch {
+                    dao.insertExercise(
+                        ExerciseEntity(
+                            workoutId = activeWorkout!!.id,
+                            name = name
+                        )
+                    )
+                }
                 showCatalog = false
             }
         )
@@ -163,6 +208,24 @@ fun TrainingScreen() {
             scope.launch { dao.insertSet(WorkoutSetEntity(exerciseId = exercise.id, weight = weight, reps = reps)) }
             addingSetFor = null
         }
+    }
+
+    if (confirmFinish && activeWorkout != null) {
+        AlertDialog(
+            onDismissRequest = { confirmFinish = false },
+            title = { Text("Завершить тренировку?") },
+            text = { Text("Упражнений: ${exercises.size}\nПодходов: $setCount\nОбъём: ${formatNumber(volume)} кг") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val id = activeWorkout!!.id
+                    scope.launch { dao.finishWorkout(id) }
+                    confirmFinish = false
+                    addingSetFor = null
+                    showCatalog = false
+                }) { Text("Завершить") }
+            },
+            dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text("Отмена") } }
+        )
     }
 }
 
@@ -212,7 +275,7 @@ private fun WorkoutSummary(exerciseCount: Int, setCount: Int, volume: Double) {
             SummaryValue(exerciseCount.toString(), "упр.")
             SummaryValue(setCount.toString(), "подх.")
             SummaryValue(formatNumber(volume), "кг")
-            SummaryValue("—", "мин")
+            SummaryValue("идёт", "статус")
         }
     }
 }
