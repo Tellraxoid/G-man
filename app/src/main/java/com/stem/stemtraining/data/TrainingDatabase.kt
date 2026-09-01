@@ -12,6 +12,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Update
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
@@ -23,10 +24,7 @@ data class WorkoutEntity(
     val endedAt: Long? = null
 )
 
-@Entity(
-    tableName = "exercises",
-    indices = [Index("workoutId")]
-)
+@Entity(tableName = "exercises", indices = [Index("workoutId")])
 data class ExerciseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workoutId: Long,
@@ -36,14 +34,7 @@ data class ExerciseEntity(
 
 @Entity(
     tableName = "workout_sets",
-    foreignKeys = [
-        ForeignKey(
-            entity = ExerciseEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["exerciseId"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
+    foreignKeys = [ForeignKey(entity = ExerciseEntity::class, parentColumns = ["id"], childColumns = ["exerciseId"], onDelete = ForeignKey.CASCADE)],
     indices = [Index("exerciseId")]
 )
 data class WorkoutSetEntity(
@@ -52,6 +43,13 @@ data class WorkoutSetEntity(
     val weight: Double,
     val reps: Int,
     val createdAt: Long = System.currentTimeMillis()
+)
+
+data class WorkoutSummaryRow(
+    val workoutId: Long,
+    val exerciseCount: Int,
+    val setCount: Int,
+    val volume: Double
 )
 
 @Dao
@@ -68,6 +66,9 @@ interface TrainingDao {
     @Query("SELECT workout_sets.* FROM workout_sets INNER JOIN exercises ON exercises.id = workout_sets.exerciseId WHERE exercises.workoutId = :workoutId ORDER BY workout_sets.createdAt ASC, workout_sets.id ASC")
     fun observeSets(workoutId: Long): Flow<List<WorkoutSetEntity>>
 
+    @Query("SELECT workouts.id AS workoutId, COUNT(DISTINCT exercises.id) AS exerciseCount, COUNT(workout_sets.id) AS setCount, COALESCE(SUM(workout_sets.weight * workout_sets.reps), 0.0) AS volume FROM workouts LEFT JOIN exercises ON exercises.workoutId = workouts.id LEFT JOIN workout_sets ON workout_sets.exerciseId = exercises.id WHERE workouts.endedAt IS NOT NULL GROUP BY workouts.id")
+    fun observeCompletedSummaries(): Flow<List<WorkoutSummaryRow>>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertWorkout(workout: WorkoutEntity): Long
 
@@ -76,6 +77,9 @@ interface TrainingDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertSet(set: WorkoutSetEntity): Long
+
+    @Update
+    suspend fun updateSet(set: WorkoutSetEntity)
 
     @Query("UPDATE workouts SET endedAt = :endedAt WHERE id = :workoutId AND endedAt IS NULL")
     suspend fun finishWorkout(workoutId: Long, endedAt: Long = System.currentTimeMillis())
@@ -87,17 +91,12 @@ interface TrainingDao {
     suspend fun deleteExercise(exerciseId: Long)
 }
 
-@Database(
-    entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class],
-    version = 2,
-    exportSchema = false
-)
+@Database(entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class], version = 2, exportSchema = false)
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun trainingDao(): TrainingDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: TrainingDatabase? = null
+        @Volatile private var INSTANCE: TrainingDatabase? = null
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -109,16 +108,9 @@ abstract class TrainingDatabase : RoomDatabase() {
             }
         }
 
-        fun getInstance(context: Context): TrainingDatabase =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    TrainingDatabase::class.java,
-                    "stem_training.db"
-                )
-                    .addMigrations(MIGRATION_1_2)
-                    .build()
-                    .also { INSTANCE = it }
-            }
+        fun getInstance(context: Context): TrainingDatabase = INSTANCE ?: synchronized(this) {
+            INSTANCE ?: Room.databaseBuilder(context.applicationContext, TrainingDatabase::class.java, "stem_training.db")
+                .addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+        }
     }
 }
