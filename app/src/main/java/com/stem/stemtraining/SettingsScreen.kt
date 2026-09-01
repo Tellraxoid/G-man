@@ -1,35 +1,38 @@
 package com.stem.stemtraining
 
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.stem.stemtraining.data.*
+import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
-@Composable fun SettingsScreen() {
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("stem_settings", 0) }
-    var athlete by remember { mutableStateOf(prefs.getString("athlete", "") ?: "") }
-    var rest by remember { mutableStateOf(prefs.getInt("rest", 90).toString()) }
-    var vibration by remember { mutableStateOf(prefs.getBoolean("vibration", true)) }
-    var saved by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Spacer(Modifier.height(4.dp)); Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("ПРИЛОЖЕНИЕ", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelLarge); Text("Настройки", style = MaterialTheme.typography.headlineMedium) }; Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Rounded.Settings, null, Modifier.padding(12.dp)) } }
-        Text("Профиль", style = MaterialTheme.typography.titleLarge)
-        OutlinedTextField(athlete, { athlete = it }, label = { Text("Имя спортсмена") }, leadingIcon = { Icon(Icons.Rounded.Person, null) }, modifier = Modifier.fillMaxWidth())
-        Text("Тренировка", style = MaterialTheme.typography.titleLarge)
-        OutlinedTextField(rest, { rest = it.filter(Char::isDigit) }, label = { Text("Отдых между подходами, сек") }, leadingIcon = { Icon(Icons.Rounded.Timer, null) }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        Card(Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Column { Text("Вибрация таймера", fontWeight = FontWeight.Bold); Text("Сигнал по окончании отдыха", style = MaterialTheme.typography.bodySmall) }; Switch(vibration, { vibration = it }) } }
-        Button({ prefs.edit().putString("athlete", athlete.trim()).putInt("rest", rest.toIntOrNull()?.coerceIn(15, 600) ?: 90).putBoolean("vibration", vibration).apply(); saved = true }, Modifier.fillMaxWidth().height(52.dp)) { Text("Сохранить настройки") }
-        if (saved) Text("Настройки сохранены", color = MaterialTheme.colorScheme.primary)
-        HorizontalDivider(); Text("S.T.E.M. Training 1.0", style = MaterialTheme.typography.bodySmall); Text("Данные тренировок хранятся только на устройстве.", style = MaterialTheme.typography.bodySmall)
-    }
+@Composable fun SettingsScreen(){val context=LocalContext.current;val prefs=remember{context.getSharedPreferences("stem_settings",0)};val dao=remember{TrainingDatabase.getInstance(context).trainingDao()};val scope=rememberCoroutineScope();var athlete by remember{mutableStateOf(prefs.getString("athlete","")?:"")};var rest by remember{mutableStateOf(prefs.getInt("rest",90).toString())};var vibration by remember{mutableStateOf(prefs.getBoolean("vibration",true))};var weeklyGoal by remember{mutableStateOf(prefs.getInt("weekly_goal",3).toString())};var status by remember{mutableStateOf("")};var library by remember{mutableStateOf(false)}
+    val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{scope.launch{runCatching{context.contentResolver.openOutputStream(it)?.bufferedWriter()?.use{w->w.write(createBackup(dao))}}.onSuccess{status="Резервная копия сохранена"}.onFailure{status="Не удалось сохранить: ${it.message}"}}}}
+    val import=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{scope.launch{runCatching{val text=context.contentResolver.openInputStream(it)?.bufferedReader()?.use{r->r.readText()}?:error("Пустой файл");restoreBackup(dao,text)}.onSuccess{status="Данные восстановлены"}.onFailure{status="Ошибка импорта: ${it.message}"}}}}
+    Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Spacer(Modifier.height(4.dp));Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("ПРИЛОЖЕНИЕ",color=MaterialTheme.colorScheme.secondary,style=MaterialTheme.typography.labelLarge);Text("Настройки",style=MaterialTheme.typography.headlineMedium)};Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.primaryContainer){Icon(Icons.Rounded.Settings,null,Modifier.padding(12.dp))}}
+        OutlinedTextField(athlete,{athlete=it},label={Text("Имя спортсмена")},leadingIcon={Icon(Icons.Rounded.Person,null)},modifier=Modifier.fillMaxWidth());Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(rest,{rest=it.filter(Char::isDigit)},label={Text("Отдых, сек")},leadingIcon={Icon(Icons.Rounded.Timer,null)},modifier=Modifier.weight(1f),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number));OutlinedTextField(weeklyGoal,{weeklyGoal=it.filter(Char::isDigit)},label={Text("Цель/нед.")},modifier=Modifier.weight(1f),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))}
+        Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Column{Text("Вибрация таймера",style=MaterialTheme.typography.titleMedium);Text("Сигнал после отдыха",style=MaterialTheme.typography.bodySmall)};Switch(vibration,{vibration=it})}}
+        Button({prefs.edit().putString("athlete",athlete.trim()).putInt("rest",rest.toIntOrNull()?.coerceIn(15,600)?:90).putInt("weekly_goal",weeklyGoal.toIntOrNull()?.coerceIn(1,7)?:3).putBoolean("vibration",vibration).apply();status="Настройки сохранены"},Modifier.fillMaxWidth().height(50.dp)){Text("Сохранить настройки")}
+        Text("Данные и упражнения",style=MaterialTheme.typography.titleLarge);OutlinedButton({library=true},Modifier.fillMaxWidth()){Icon(Icons.Rounded.FitnessCenter,null);Text(" Библиотека упражнений")};Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton({export.launch("stem-training-backup.json")},Modifier.weight(1f)){Icon(Icons.Rounded.Upload,null);Text(" Экспорт")};OutlinedButton({import.launch(arrayOf("application/json"))},Modifier.weight(1f)){Icon(Icons.Rounded.Download,null);Text(" Импорт")}}
+        if(status.isNotBlank())Text(status,color=MaterialTheme.colorScheme.secondary,style=MaterialTheme.typography.bodySmall);Text("S.T.E.M. Training 1.1 · автоматическая системная копия включена",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    };if(library)ExerciseLibraryDialog({library=false})
 }
+
+@Composable private fun ExerciseLibraryDialog(dismiss:()->Unit){val context=LocalContext.current;val prefs=context.getSharedPreferences("stem_settings",0);var custom by remember{mutableStateOf(prefs.getStringSet("custom_exercises",emptySet())?.toList()?:emptyList())};var favorites by remember{mutableStateOf(prefs.getStringSet("favorite_exercises",emptySet())?:emptySet())};var name by remember{mutableStateOf("")};var muscle by remember{mutableStateOf("")};AlertDialog(onDismissRequest=dismiss,title={Text("Библиотека упражнений")},text={Column{OutlinedTextField(name,{name=it},label={Text("Новое упражнение")},modifier=Modifier.fillMaxWidth());OutlinedTextField(muscle,{muscle=it},label={Text("Группа мышц")},modifier=Modifier.fillMaxWidth());Button({if(name.isNotBlank()){custom=custom+"${name.trim()}|${muscle.ifBlank{"Другое"}.trim()}";prefs.edit().putStringSet("custom_exercises",custom.toSet()).apply();name="";muscle=""}},Modifier.fillMaxWidth()){Text("Добавить")};Spacer(Modifier.height(8.dp));custom.forEach{entry->val n=entry.substringBefore('|');Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(n,Modifier.weight(1f));IconButton({favorites=if(n in favorites)favorites-n else favorites+n;prefs.edit().putStringSet("favorite_exercises",favorites).apply()}){Icon(if(n in favorites)Icons.Rounded.Star else Icons.Rounded.StarBorder,null)};IconButton({custom=custom-entry;prefs.edit().putStringSet("custom_exercises",custom.toSet()).apply()}){Icon(Icons.Rounded.Delete,null)}}}}},confirmButton={TextButton(dismiss){Text("Готово")}})}
+
+private suspend fun createBackup(dao:TrainingDao):String{val root=JSONObject().put("version",1);root.put("workouts",JSONArray(dao.allWorkouts().map{JSONObject().put("id",it.id).put("startedAt",it.startedAt).put("endedAt",it.endedAt).put("notes",it.notes)}));root.put("exercises",JSONArray(dao.allExercises().map{JSONObject().put("id",it.id).put("workoutId",it.workoutId).put("name",it.name).put("createdAt",it.createdAt).put("targetSets",it.targetSets).put("targetReps",it.targetReps)}));root.put("sets",JSONArray(dao.allSets().map{JSONObject().put("id",it.id).put("exerciseId",it.exerciseId).put("weight",it.weight).put("reps",it.reps).put("createdAt",it.createdAt).put("rir",it.rir).put("warmup",it.isWarmup)}));root.put("programs",JSONArray(dao.allPrograms().map{JSONObject().put("id",it.id).put("name",it.name).put("createdAt",it.createdAt)}));root.put("programExercises",JSONArray(dao.allProgramExercises().map{JSONObject().put("id",it.id).put("programId",it.programId).put("name",it.name).put("position",it.position).put("targetSets",it.targetSets).put("targetReps",it.targetReps)}));return root.toString()}
+private fun jsonObjects(a:JSONArray)= (0 until a.length()).map{a.getJSONObject(it)}
+private suspend fun restoreBackup(dao:TrainingDao,text:String){val r=JSONObject(text);val w=jsonObjects(r.getJSONArray("workouts")).map{WorkoutEntity(it.getLong("id"),it.getLong("startedAt"),if(it.isNull("endedAt"))null else it.getLong("endedAt"),it.optString("notes"))};val e=jsonObjects(r.getJSONArray("exercises")).map{ExerciseEntity(it.getLong("id"),it.getLong("workoutId"),it.getString("name"),it.getLong("createdAt"),if(it.isNull("targetSets"))null else it.getInt("targetSets"),if(it.isNull("targetReps"))null else it.getInt("targetReps"))};val s=jsonObjects(r.getJSONArray("sets")).map{WorkoutSetEntity(it.getLong("id"),it.getLong("exerciseId"),it.getDouble("weight"),it.getInt("reps"),it.getLong("createdAt"),if(it.isNull("rir"))null else it.getInt("rir"),it.optBoolean("warmup"))};val p=jsonObjects(r.getJSONArray("programs")).map{ProgramEntity(it.getLong("id"),it.getString("name"),it.getLong("createdAt"))};val pe=jsonObjects(r.getJSONArray("programExercises")).map{ProgramExerciseEntity(it.getLong("id"),it.getLong("programId"),it.getString("name"),it.getInt("position"),it.optInt("targetSets",3),it.optInt("targetReps",10))};dao.restore(w,e,s,p,pe)}
