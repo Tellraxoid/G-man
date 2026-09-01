@@ -28,4 +28,9 @@ class ExerciseIconsTest {
         assertEquals(R.drawable.exercise_hanging_leg_raise, exerciseIcon("Подъём ног в висе"))
         assertEquals(R.drawable.exercise_dips, exerciseIcon("Отжимания на брусьях"))
     }
+
+    @Test fun newAbExercisesUseDedicatedIllustrations() {
+        assertEquals(R.drawable.exercise_decline_crunch, exerciseIcon("Скручивания на обратной скамье"))
+        assertEquals(R.drawable.exercise_parallel_bar_leg_raise, exerciseIcon("Подъём ног в висе на брусьях"))
+    }
 }

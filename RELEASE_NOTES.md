@@ -1,4 +1,4 @@
-# S.T.E.M. Training 1.2.5 Beta
+# S.T.E.M. Training 1.2.6 Beta
 
 The first installable beta of the complete gym diary.
 
@@ -17,6 +17,7 @@ The first installable beta of the complete gym diary.
 - Reframed full-body hammer-curl and crunch illustrations with clean square crops.
 - Added preacher curls, hanging leg raises, and parallel-bar dips with dedicated illustrations.
 - Added compact exercise illustrations to program preview and editing screens.
+- Added decline-bench crunches and parallel-bar leg raises with dedicated abdominal exercise illustrations.
 - Portable JSON backup and restore.
 - New S.T.E.M. visual identity, onboarding, launcher icon, and splash screen.
 
