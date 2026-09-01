@@ -42,13 +42,25 @@ data class ProgramWithExercises(@Embedded val program: ProgramEntity, @Relation(
     @Transaction suspend fun saveProgram(program: ProgramEntity, names: List<String>): Long { val id = if (program.id == 0L) insertProgram(program) else { updateProgram(program); clearProgramExercises(program.id); program.id }; insertProgramExercises(names.mapIndexed { index, name -> ProgramExerciseEntity(programId = id, name = name, position = index) }); return id }
 }
 
-@Database(entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class, ProgramEntity::class, ProgramExerciseEntity::class], version = 3, exportSchema = false)
+@Database(entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class, ProgramEntity::class, ProgramExerciseEntity::class], version = 4, exportSchema = false)
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun trainingDao(): TrainingDao
     companion object {
         @Volatile private var instance: TrainingDatabase? = null
         private val migration1To2 = object : Migration(1, 2) { override fun migrate(db: SupportSQLiteDatabase) { val now = System.currentTimeMillis(); db.execSQL("CREATE TABLE IF NOT EXISTS workouts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, startedAt INTEGER NOT NULL, endedAt INTEGER)"); db.execSQL("INSERT INTO workouts (id, startedAt, endedAt) VALUES (1, $now, $now)"); db.execSQL("ALTER TABLE exercises ADD COLUMN workoutId INTEGER NOT NULL DEFAULT 1"); db.execSQL("CREATE INDEX IF NOT EXISTS index_exercises_workoutId ON exercises(workoutId)") } }
         private val migration2To3 = object : Migration(2, 3) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("CREATE TABLE IF NOT EXISTS programs (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, createdAt INTEGER NOT NULL)"); db.execSQL("CREATE TABLE IF NOT EXISTS program_exercises (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, programId INTEGER NOT NULL, name TEXT NOT NULL, position INTEGER NOT NULL, FOREIGN KEY(programId) REFERENCES programs(id) ON UPDATE NO ACTION ON DELETE CASCADE)"); db.execSQL("CREATE INDEX IF NOT EXISTS index_program_exercises_programId ON program_exercises(programId)") } }
-        fun getInstance(context: Context): TrainingDatabase = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, TrainingDatabase::class.java, "stem_training.db").addMigrations(migration1To2, migration2To3).build().also { instance = it } }
+        private val migration3To4 = object : Migration(3, 4) { override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE exercises_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, workoutId INTEGER NOT NULL, name TEXT NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY(workoutId) REFERENCES workouts(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            db.execSQL("INSERT INTO exercises_new (id, workoutId, name, createdAt) SELECT id, workoutId, name, createdAt FROM exercises")
+            db.execSQL("CREATE TABLE workout_sets_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, exerciseId INTEGER NOT NULL, weight REAL NOT NULL, reps INTEGER NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY(exerciseId) REFERENCES exercises_new(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            db.execSQL("INSERT INTO workout_sets_new (id, exerciseId, weight, reps, createdAt) SELECT id, exerciseId, weight, reps, createdAt FROM workout_sets")
+            db.execSQL("DROP TABLE workout_sets")
+            db.execSQL("DROP TABLE exercises")
+            db.execSQL("ALTER TABLE exercises_new RENAME TO exercises")
+            db.execSQL("ALTER TABLE workout_sets_new RENAME TO workout_sets")
+            db.execSQL("CREATE INDEX index_exercises_workoutId ON exercises(workoutId)")
+            db.execSQL("CREATE INDEX index_workout_sets_exerciseId ON workout_sets(exerciseId)")
+        } }
+        fun getInstance(context: Context): TrainingDatabase = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, TrainingDatabase::class.java, "stem_training.db").addMigrations(migration1To2, migration2To3, migration3To4).build().also { instance = it } }
     }
 }
