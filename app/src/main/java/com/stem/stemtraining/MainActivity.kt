@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -27,18 +27,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.stem.stemtraining.data.ExerciseEntity
+import com.stem.stemtraining.data.TrainingDatabase
+import com.stem.stemtraining.data.WorkoutSetEntity
 import com.stem.stemtraining.ui.theme.STEMTrainingTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,27 +53,26 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-data class WorkoutSet(val weight: Double, val reps: Int)
-data class ExerciseUi(val name: String, val sets: List<WorkoutSet>)
-
-private val initialExercises = listOf(
-    ExerciseUi("Тяга в наклоне · штанга", listOf(WorkoutSet(100.0, 12), WorkoutSet(100.0, 12), WorkoutSet(100.0, 12))),
-    ExerciseUi("Тяга в наклоне одной рукой · гантель", listOf(WorkoutSet(35.0, 12), WorkoutSet(42.5, 8), WorkoutSet(42.5, 8))),
-    ExerciseUi("Шраги · гантели", listOf(WorkoutSet(42.5, 15), WorkoutSet(42.5, 15), WorkoutSet(42.5, 15))),
-    ExerciseUi("Разведение рук в наклоне · гантели", listOf(WorkoutSet(15.0, 12), WorkoutSet(15.0, 12), WorkoutSet(15.0, 12)))
-)
-
 @Composable
 fun TrainingScreen() {
-    val exercises = remember { mutableStateListOf<ExerciseUi>().apply { addAll(initialExercises) } }
-    var editingExerciseIndex by remember { mutableStateOf<Int?>(null) }
+    val context = LocalContext.current
+    val dao = remember { TrainingDatabase.getInstance(context).trainingDao() }
+    val exercises by dao.observeExercises().collectAsState(initial = emptyList())
+    val allSets by dao.observeSets().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
 
-    val setCount = exercises.sumOf { it.sets.size }
-    val volume = exercises.sumOf { exercise -> exercise.sets.sumOf { it.weight * it.reps } }
+    var addingExercise by remember { mutableStateOf(false) }
+    var addingSetFor by remember { mutableStateOf<ExerciseEntity?>(null) }
+
+    val setCount = allSets.size
+    val volume = allSets.sumOf { it.weight * it.reps }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -86,16 +90,37 @@ fun TrainingScreen() {
                 }
                 Spacer(Modifier.height(16.dp))
                 WorkoutSummary(exercises.size, setCount, volume)
-                Spacer(Modifier.height(8.dp))
-                Text("Спина   Плечи", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
 
-            itemsIndexed(exercises) { index, exercise ->
-                ExerciseCard(exercise, onAddSet = { editingExerciseIndex = index })
+            if (exercises.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text("Тренировка пока пустая", fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(6.dp))
+                            Text("Добавь первое упражнение и начни записывать рабочие подходы.")
+                        }
+                    }
+                }
+            }
+
+            items(exercises, key = { it.id }) { exercise ->
+                val sets = allSets.filter { it.exerciseId == exercise.id }
+                ExerciseCard(
+                    exercise = exercise,
+                    sets = sets,
+                    onAddSet = { addingSetFor = exercise }
+                )
             }
 
             item {
-                Button(onClick = { }, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                Button(
+                    onClick = { addingExercise = true },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                ) {
                     Text("+  Добавить упражнение")
                 }
                 Spacer(Modifier.height(24.dp))
@@ -103,15 +128,33 @@ fun TrainingScreen() {
         }
     }
 
-    editingExerciseIndex?.let { index ->
+    if (addingExercise) {
+        AddExerciseDialog(
+            onDismiss = { addingExercise = false },
+            onAdd = { name ->
+                scope.launch { dao.insertExercise(ExerciseEntity(name = name.trim())) }
+                addingExercise = false
+            }
+        )
+    }
+
+    addingSetFor?.let { exercise ->
+        val previousSet = allSets.lastOrNull { it.exerciseId == exercise.id }
         AddSetDialog(
-            exerciseName = exercises[index].name,
-            previousSet = exercises[index].sets.lastOrNull(),
-            onDismiss = { editingExerciseIndex = null },
+            exerciseName = exercise.name,
+            previousSet = previousSet,
+            onDismiss = { addingSetFor = null },
             onAdd = { weight, reps ->
-                val exercise = exercises[index]
-                exercises[index] = exercise.copy(sets = exercise.sets + WorkoutSet(weight, reps))
-                editingExerciseIndex = null
+                scope.launch {
+                    dao.insertSet(
+                        WorkoutSetEntity(
+                            exerciseId = exercise.id,
+                            weight = weight,
+                            reps = reps
+                        )
+                    )
+                }
+                addingSetFor = null
             }
         )
     }
@@ -145,7 +188,11 @@ private fun SummaryValue(value: String, label: String) {
 }
 
 @Composable
-private fun ExerciseCard(exercise: ExerciseUi, onAddSet: () -> Unit) {
+private fun ExerciseCard(
+    exercise: ExerciseEntity,
+    sets: List<WorkoutSetEntity>,
+    onAddSet: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -172,11 +219,16 @@ private fun ExerciseCard(exercise: ExerciseUi, onAddSet: () -> Unit) {
                 Text("⋮", modifier = Modifier.padding(6.dp), style = MaterialTheme.typography.headlineSmall)
             }
             Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                exercise.sets.takeLast(4).forEach { set ->
-                    Column {
-                        Text("${formatNumber(set.weight)} кг", fontWeight = FontWeight.Bold)
-                        Text("${set.reps} повт", style = MaterialTheme.typography.bodyMedium)
+
+            if (sets.isEmpty()) {
+                Text("Подходов пока нет", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    sets.takeLast(4).forEach { set ->
+                        Column {
+                            Text("${formatNumber(set.weight)} кг", fontWeight = FontWeight.Bold)
+                            Text("${set.reps} повт", style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
@@ -185,14 +237,42 @@ private fun ExerciseCard(exercise: ExerciseUi, onAddSet: () -> Unit) {
 }
 
 @Composable
+private fun AddExerciseDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Новое упражнение") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Название") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank(), onClick = { onAdd(name) }) {
+                Text("Добавить")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}
+
+@Composable
 private fun AddSetDialog(
     exerciseName: String,
-    previousSet: WorkoutSet?,
+    previousSet: WorkoutSetEntity?,
     onDismiss: () -> Unit,
     onAdd: (Double, Int) -> Unit
 ) {
-    var weight by remember(previousSet) { mutableStateOf(previousSet?.let { formatNumber(it.weight) } ?: "") }
-    var reps by remember(previousSet) { mutableStateOf(previousSet?.reps?.toString() ?: "") }
+    var weight by remember(previousSet) {
+        mutableStateOf(previousSet?.let { formatNumber(it.weight) } ?: "")
+    }
+    var reps by remember(previousSet) {
+        mutableStateOf(previousSet?.reps?.toString() ?: "")
+    }
     val valid = weight.replace(',', '.').toDoubleOrNull() != null && reps.toIntOrNull() != null
 
     AlertDialog(
@@ -231,9 +311,3 @@ private fun AddSetDialog(
 
 private fun formatNumber(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
-
-@Preview(showBackground = true)
-@Composable
-private fun TrainingScreenPreview() {
-    STEMTrainingTheme { TrainingScreen() }
-}
