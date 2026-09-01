@@ -1,9 +1,18 @@
 package com.stem.stemtraining
 
 import android.os.Bundle
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,7 +35,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { STEMTrainingTheme { StemApp() } } } }
+class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("rest_timer","Таймер отдыха",NotificationManager.IMPORTANCE_DEFAULT)); if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),7); setContent { STEMTrainingTheme { StemApp() } } } }
 
 private enum class Page(val title: String) { TRAINING("Тренировка"), HISTORY("Календарь"), PROGRAMS("Программы"), STATS("Прогресс"), SETTINGS("Настройки") }
 
@@ -51,9 +60,9 @@ private enum class Page(val title: String) { TRAINING("Тренировка"), H
 
 private suspend fun seedPrograms(dao: TrainingDao) {
     if (dao.programCount() != 0) return
-    starterPrograms.forEach { starter -> dao.saveProgram(ProgramEntity(name = starter.name), starter.exercises) }
+    starterPrograms.forEach { starter -> dao.saveProgram(ProgramEntity(name = starter.name), starter.exercises.mapIndexed { index, name -> ProgramExerciseEntity(programId=0,name=name,position=index) }) }
 }
-private suspend fun startProgram(dao: TrainingDao, program: ProgramWithExercises) { val workoutId = dao.insertWorkout(WorkoutEntity()); program.exercises.sortedBy { it.position }.forEach { dao.insertExercise(ExerciseEntity(workoutId = workoutId, name = it.name)) } }
+private suspend fun startProgram(dao: TrainingDao, program: ProgramWithExercises) { val workoutId = dao.insertWorkout(WorkoutEntity()); program.exercises.sortedBy { it.position }.forEach { dao.insertExercise(ExerciseEntity(workoutId=workoutId,name=it.name,targetSets=it.targetSets,targetReps=it.targetReps)) } }
 
 data class CatalogExercise(val name: String, val muscle: String)
 val exerciseCatalog = listOf(
@@ -64,7 +73,7 @@ val exerciseCatalog = listOf(
     val context = LocalContext.current; val dao = remember { TrainingDatabase.getInstance(context).trainingDao() }; val scope = rememberCoroutineScope()
     val active by dao.observeActiveWorkout().collectAsState(initial = null); val id = active?.id ?: -1
     val exercises by remember(id) { dao.observeExercises(id) }.collectAsState(initial = emptyList()); val sets by remember(id) { dao.observeSets(id) }.collectAsState(initial = emptyList())
-    var catalog by remember { mutableStateOf(false) }; var setFor by remember { mutableStateOf<ExerciseEntity?>(null) }; var editSet by remember { mutableStateOf<WorkoutSetEntity?>(null) }; var editExercise by remember { mutableStateOf<ExerciseEntity?>(null) }; var finish by remember { mutableStateOf(false) }
+    var catalog by remember { mutableStateOf(false) }; var setFor by remember { mutableStateOf<ExerciseEntity?>(null) }; var editSet by remember { mutableStateOf<WorkoutSetEntity?>(null) }; var editExercise by remember { mutableStateOf<ExerciseEntity?>(null) }; var finish by remember { mutableStateOf(false) }; var restEndsAt by remember { mutableLongStateOf(0L) }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Spacer(Modifier.height(18.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("S.T.E.M.", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelLarge); Text(if (active == null) "Тренировка" else "В процессе", style = MaterialTheme.typography.headlineMedium) }; Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Rounded.Bolt, null, Modifier.padding(12.dp)) } } }
         if (active == null) item { Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) { Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Rounded.FitnessCenter, null, Modifier.padding(14.dp).size(28.dp)) }; Text("Готовы стать сильнее?", style = MaterialTheme.typography.titleLarge); Text("Начните свободную тренировку или следуйте сохранённой программе.", color = MaterialTheme.colorScheme.onSurfaceVariant); Button({ scope.launch { dao.insertWorkout(WorkoutEntity()) } }, Modifier.fillMaxWidth().height(52.dp)) { Icon(Icons.Rounded.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text("Начать тренировку") }; OutlinedButton(onPrograms, Modifier.fillMaxWidth().height(52.dp)) { Icon(Icons.Rounded.ViewList, null); Spacer(Modifier.width(8.dp)); Text("Выбрать программу") } } } }
@@ -75,15 +84,27 @@ val exerciseCatalog = listOf(
         }
     }
     if (catalog && active != null) ExerciseCatalogDialog(exercises.map { it.name }.toSet(), { catalog = false }) { scope.launch { dao.insertExercise(ExerciseEntity(workoutId = active!!.id, name = it)) }; catalog = false }
-    setFor?.let { exercise -> SetDialog(null, { setFor = null }, save = { weight, reps -> scope.launch { dao.insertSet(WorkoutSetEntity(exerciseId = exercise.id, weight = weight, reps = reps)) }; setFor = null }) }
+    setFor?.let { exercise -> SetDialog(null, { setFor = null }, save = { weight, reps -> scope.launch { dao.insertSet(WorkoutSetEntity(exerciseId = exercise.id, weight = weight, reps = reps)) }; restEndsAt=System.currentTimeMillis()+context.getSharedPreferences("stem_settings",0).getInt("rest",90)*1000L; setFor = null }) }
     editSet?.let { set -> SetDialog(set, { editSet = null }, { weight, reps -> scope.launch { dao.updateSet(set.copy(weight = weight, reps = reps)) }; editSet = null }, { scope.launch { dao.deleteSet(set.id) }; editSet = null }) }
     editExercise?.let { exercise -> ExerciseDialog(exercise, { editExercise = null }, { name -> scope.launch { dao.updateExercise(exercise.copy(name = name)) }; editExercise = null }, { scope.launch { dao.deleteExercise(exercise.id) }; editExercise = null }) }
     if (finish && active != null) AlertDialog(onDismissRequest = { finish = false }, title = { Text("Завершить тренировку?") }, text = { Text("${exercises.size} упражнений · ${sets.size} подходов · ${number(sets.sumOf { it.weight * it.reps })} кг") }, confirmButton = { TextButton({ scope.launch { dao.finishWorkout(active!!.id) }; finish = false }) { Text("Завершить") } }, dismissButton = { TextButton({ finish = false }) { Text("Отмена") } })
+    if(restEndsAt>System.currentTimeMillis()) RestTimer(restEndsAt,{restEndsAt+=30_000},{restEndsAt=0}){notifyRestFinished(context);restEndsAt=0}
 }
+
+@Composable private fun RestTimer(endsAt:Long,addTime:()->Unit,skip:()->Unit,finished:()->Unit){var now by remember{mutableLongStateOf(System.currentTimeMillis())};LaunchedEffect(endsAt){while(now<endsAt){delay(250);now=System.currentTimeMillis()};finished()};val left=((endsAt-now+999)/1000).coerceAtLeast(0);AlertDialog(onDismissRequest={},icon={Icon(Icons.Rounded.Timer,null)},title={Text("Отдых")},text={Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.fillMaxWidth()){Text("${left/60}:${(left%60).toString().padStart(2,'0')}",style=MaterialTheme.typography.displaySmall);LinearProgressIndicator(progress={left/90f},modifier=Modifier.fillMaxWidth())}},confirmButton={TextButton(skip){Text("Пропустить")}},dismissButton={TextButton(addTime){Text("+30 сек")}})}
+private fun notifyRestFinished(context:android.content.Context){if(context.getSharedPreferences("stem_settings",0).getBoolean("vibration",true)){val v=context.getSystemService(Vibrator::class.java);if(Build.VERSION.SDK_INT>=26)v.vibrate(VibrationEffect.createOneShot(500,VibrationEffect.DEFAULT_AMPLITUDE))else @Suppress("DEPRECATION") v.vibrate(500)};if(Build.VERSION.SDK_INT<33||context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)NotificationManagerCompat.from(context).notify(90,NotificationCompat.Builder(context,"rest_timer").setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("Отдых закончен").setContentText("Время следующего подхода").setAutoCancel(true).build())}
 
 @Composable private fun ActiveTimer(startedAt: Long, exercises: Int, sets: Int, volume: Double) { var now by remember { mutableLongStateOf(System.currentTimeMillis()) }; LaunchedEffect(startedAt) { while (true) { now = System.currentTimeMillis(); delay(1000) } }; val seconds = ((now - startedAt) / 1000).coerceAtLeast(0); Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Column(Modifier.padding(20.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.Timer, null); Spacer(Modifier.width(8.dp)); Text("АКТИВНАЯ СЕССИЯ", style = MaterialTheme.typography.labelLarge) }; Spacer(Modifier.height(16.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Metric(String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60), "время"); Metric(exercises.toString(), "упр."); Metric(sets.toString(), "подх."); Metric(number(volume), "кг") } } } }
 @Composable private fun Metric(value: String, label: String) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(value, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.labelSmall) } }
-@Composable private fun ExerciseCard(exercise: ExerciseEntity, sets: List<WorkoutSetEntity>, add: () -> Unit, edit: (WorkoutSetEntity) -> Unit, menu: () -> Unit) { Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) { Column(Modifier.padding(18.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceVariant) { Icon(Icons.Rounded.FitnessCenter, null, Modifier.padding(9.dp).size(20.dp)) }; Spacer(Modifier.width(12.dp)); Text(exercise.name, Modifier.weight(1f).clickable { menu() }, style = MaterialTheme.typography.titleMedium); IconButton(menu) { Icon(Icons.Rounded.MoreVert, "Изменить") } }; if (sets.isEmpty()) Text("Добавьте первый рабочий подход", Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) else { Spacer(Modifier.height(8.dp)); Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceVariant) { Column { sets.forEachIndexed { index, set -> Row(Modifier.fillMaxWidth().clickable { edit(set) }.padding(horizontal = 14.dp, vertical = 11.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("ПОДХОД ${index + 1}", style = MaterialTheme.typography.labelSmall); Text("${number(set.weight)} кг  ×  ${set.reps}", fontWeight = FontWeight.Bold) }; if(index < sets.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 14.dp)) } } } }; TextButton(add, Modifier.align(Alignment.End)) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Text(" Подход") } } } }
+@Composable private fun ExerciseCard(exercise:ExerciseEntity,sets:List<WorkoutSetEntity>,add:()->Unit,edit:(WorkoutSetEntity)->Unit,menu:()->Unit){
+    val context=LocalContext.current;val dao=remember{TrainingDatabase.getInstance(context).trainingDao()};val previous by dao.observePreviousSet(exercise.name).collectAsState(initial=null)
+    Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){Column(Modifier.padding(18.dp)){
+        Row(verticalAlignment=Alignment.CenterVertically){Surface(shape=MaterialTheme.shapes.small,color=MaterialTheme.colorScheme.surfaceVariant){Icon(Icons.Rounded.FitnessCenter,null,Modifier.padding(9.dp).size(20.dp))};Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(exercise.name,Modifier.clickable{menu()},style=MaterialTheme.typography.titleMedium);exercise.targetSets?.let{Text("Цель: $it × ${exercise.targetReps}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.secondary)}};IconButton(menu){Icon(Icons.Rounded.MoreVert,"Изменить")}}
+        previous?.let{Text("Прошлый раз: ${number(it.weight)} кг × ${it.reps}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=8.dp))}
+        if(sets.isEmpty())Text("Добавьте первый рабочий подход",Modifier.padding(vertical=14.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)else{Spacer(Modifier.height(8.dp));Surface(shape=MaterialTheme.shapes.small,color=MaterialTheme.colorScheme.surfaceVariant){Column{sets.forEachIndexed{index,set->Row(Modifier.fillMaxWidth().clickable{edit(set)}.padding(horizontal=14.dp,vertical=11.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("ПОДХОД ${index+1}",style=MaterialTheme.typography.labelSmall);Text("${number(set.weight)} кг  ×  ${set.reps}",fontWeight=FontWeight.Bold)};if(index<sets.lastIndex)HorizontalDivider(Modifier.padding(horizontal=14.dp))}}}}
+        TextButton(add,Modifier.align(Alignment.End)){Icon(Icons.Rounded.Add,null,Modifier.size(18.dp));Text(" Подход")}
+    }}
+}
 
 @Composable private fun SetDialog(set: WorkoutSetEntity?, dismiss: () -> Unit, save: (Double, Int) -> Unit, delete: (() -> Unit)? = null) { var weight by remember(set) { mutableStateOf(set?.weight?.let(::number) ?: "") }; var reps by remember(set) { mutableStateOf(set?.reps?.toString() ?: "") }; AlertDialog(onDismissRequest = dismiss, title = { Text(if (set == null) "Новый подход" else "Редактировать подход") }, text = { Column { OutlinedTextField(weight, { weight = it }, label = { Text("Вес, кг") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)); OutlinedTextField(reps, { reps = it.filter(Char::isDigit) }, label = { Text("Повторения") }); delete?.let { TextButton(it) { Text("Удалить", color = MaterialTheme.colorScheme.error) } } } }, confirmButton = { TextButton({ val w = weight.replace(',', '.').toDoubleOrNull(); val r = reps.toIntOrNull(); if (w != null && r != null && w >= 0 && r > 0) save(w, r) }) { Text("Сохранить") } }, dismissButton = { TextButton(dismiss) { Text("Отмена") } }) }
 @Composable private fun ExerciseDialog(exercise: ExerciseEntity, dismiss: () -> Unit, save: (String) -> Unit, delete: () -> Unit) { var name by remember(exercise) { mutableStateOf(exercise.name) }; AlertDialog(onDismissRequest = dismiss, title = { Text("Упражнение") }, text = { Column { OutlinedTextField(name, { name = it }, label = { Text("Название") }); TextButton(delete) { Text("Удалить упражнение", color = MaterialTheme.colorScheme.error) } } }, confirmButton = { TextButton({ if (name.isNotBlank()) save(name.trim()) }) { Text("Сохранить") } }, dismissButton = { TextButton(dismiss) { Text("Отмена") } }) }
