@@ -1,4 +1,4 @@
-# S.T.E.M. Training 1.2.4 Beta
+# S.T.E.M. Training 1.2.5 Beta
 
 The first installable beta of the complete gym diary.
 
@@ -15,6 +15,8 @@ The first installable beta of the complete gym diary.
 - Separate accurate illustrations for flat and incline barbell/dumbbell presses, incline flyes, barbell/dumbbell/hammer curls, and crunches.
 - Replace an exercise from its three-dot menu without losing its recorded sets.
 - Reframed full-body hammer-curl and crunch illustrations with clean square crops.
+- Added preacher curls, hanging leg raises, and parallel-bar dips with dedicated illustrations.
+- Added compact exercise illustrations to program preview and editing screens.
 - Portable JSON backup and restore.
 - New S.T.E.M. visual identity, onboarding, launcher icon, and splash screen.
 

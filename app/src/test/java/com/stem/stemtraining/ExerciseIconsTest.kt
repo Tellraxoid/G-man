@@ -22,4 +22,10 @@ class ExerciseIconsTest {
         assertEquals(R.drawable.exercise_crunch, exerciseIcon("Скручивания"))
         assertNotEquals(exerciseIcon("Скручивания"), exerciseIcon("Планка"))
     }
+
+    @Test fun newBenchHangingAndDipExercisesUseDedicatedIllustrations() {
+        assertEquals(R.drawable.exercise_preacher_curl, exerciseIcon("Сгибание рук на скамье Скотта"))
+        assertEquals(R.drawable.exercise_hanging_leg_raise, exerciseIcon("Подъём ног в висе"))
+        assertEquals(R.drawable.exercise_dips, exerciseIcon("Отжимания на брусьях"))
+    }
 }

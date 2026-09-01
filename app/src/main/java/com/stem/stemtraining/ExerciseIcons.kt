@@ -3,6 +3,9 @@ package com.stem.stemtraining
 import androidx.annotation.DrawableRes
 
 @DrawableRes fun exerciseIcon(name:String):Int=when{
+    name.contains("скамье Скотта",true)->R.drawable.exercise_preacher_curl
+    name.contains("подъём ног в висе",true)->R.drawable.exercise_hanging_leg_raise
+    name.contains("отжимания на брусьях",true)->R.drawable.exercise_dips
     name.contains("разведение рук на наклонной",true)->R.drawable.exercise_incline_fly
     name.contains("разведение рук лёжа",true)->R.drawable.exercise_fly
     name.contains("наклонной скамье",true)&&name.contains("гантел",true)->R.drawable.exercise_incline_dumbbell_press
