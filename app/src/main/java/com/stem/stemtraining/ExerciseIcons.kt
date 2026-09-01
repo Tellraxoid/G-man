@@ -3,7 +3,11 @@ package com.stem.stemtraining
 import androidx.annotation.DrawableRes
 
 @DrawableRes fun exerciseIcon(name:String):Int=when{
+    name.contains("разведение рук на наклонной",true)->R.drawable.exercise_incline_fly
     name.contains("разведение рук лёжа",true)->R.drawable.exercise_fly
+    name.contains("наклонной скамье",true)&&name.contains("гантел",true)->R.drawable.exercise_incline_dumbbell_press
+    name.contains("наклонной скамье",true)&&name.contains("штанг",true)->R.drawable.exercise_incline_barbell_press
+    name.contains("жим лёжа",true)&&name.contains("гантел",true)->R.drawable.exercise_dumbbell_bench
     name.contains("отжим",true)->R.drawable.exercise_pushup
     name.contains("тяга верхнего блока",true)->R.drawable.exercise_lat_pulldown
     name.contains("тяга горизонтального блока",true)->R.drawable.exercise_seated_row
@@ -19,8 +23,11 @@ import androidx.annotation.DrawableRes
     name.contains("станов",true)->R.drawable.exercise_deadlift
     name.contains("подтяг",true)->R.drawable.exercise_pullup
     name.contains("тяга",true)->R.drawable.exercise_row
-    name.contains("сгибание рук",true)||name.contains("молот",true)->R.drawable.exercise_curl
-    name.contains("скручив",true)||name.contains("подъём ног",true)->R.drawable.exercise_core
+    name.contains("молот",true)->R.drawable.exercise_hammer_curl
+    name.contains("сгибание рук",true)&&name.contains("штанг",true)->R.drawable.exercise_barbell_curl
+    name.contains("сгибание рук",true)&&name.contains("гантел",true)->R.drawable.exercise_dumbbell_curl
+    name.contains("скручив",true)->R.drawable.exercise_crunch
+    name.contains("подъём ног",true)->R.drawable.exercise_core
     name.contains("жим сидя",true)||name.contains("плеч",true)||name.contains("шраг",true)->R.drawable.exercise_press
     name.contains("жим лёжа",true)||name.contains("наклонной скамье",true)->R.drawable.exercise_bench
     else->R.drawable.exercise_generic

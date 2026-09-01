@@ -1,4 +1,4 @@
-# S.T.E.M. Training 1.2.2 Beta
+# S.T.E.M. Training 1.2.3 Beta
 
 The first installable beta of the complete gym diary.
 
@@ -12,6 +12,7 @@ The first installable beta of the complete gym diary.
 - White exercise illustrations with highlighted working muscle groups.
 - Faster set entry: the previous set's weight, reps, RIR, and warm-up state are prefilled.
 - Correct movement-specific illustrations across the exercise catalog, including chest flyes, cable work, leg machines, lateral raises, and plank.
+- Separate accurate illustrations for flat and incline barbell/dumbbell presses, incline flyes, barbell/dumbbell/hammer curls, and crunches.
 - Portable JSON backup and restore.
 - New S.T.E.M. visual identity, onboarding, launcher icon, and splash screen.
 
