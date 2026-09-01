@@ -12,11 +12,32 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "exercises")
+@Entity(tableName = "workouts")
+data class WorkoutEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val startedAt: Long = System.currentTimeMillis(),
+    val endedAt: Long? = null
+)
+
+@Entity(
+    tableName = "exercises",
+    foreignKeys = [
+        ForeignKey(
+            entity = WorkoutEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["workoutId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("workoutId")]
+)
 data class ExerciseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workoutId: Long,
     val name: String,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -43,17 +64,29 @@ data class WorkoutSetEntity(
 
 @Dao
 interface TrainingDao {
-    @Query("SELECT * FROM exercises ORDER BY createdAt ASC, id ASC")
-    fun observeExercises(): Flow<List<ExerciseEntity>>
+    @Query("SELECT * FROM workouts WHERE endedAt IS NULL ORDER BY startedAt DESC, id DESC LIMIT 1")
+    fun observeActiveWorkout(): Flow<WorkoutEntity?>
 
-    @Query("SELECT * FROM workout_sets ORDER BY createdAt ASC, id ASC")
-    fun observeSets(): Flow<List<WorkoutSetEntity>>
+    @Query("SELECT * FROM workouts WHERE endedAt IS NOT NULL ORDER BY startedAt DESC, id DESC")
+    fun observeCompletedWorkouts(): Flow<List<WorkoutEntity>>
+
+    @Query("SELECT * FROM exercises WHERE workoutId = :workoutId ORDER BY createdAt ASC, id ASC")
+    fun observeExercises(workoutId: Long): Flow<List<ExerciseEntity>>
+
+    @Query("SELECT workout_sets.* FROM workout_sets INNER JOIN exercises ON exercises.id = workout_sets.exerciseId WHERE exercises.workoutId = :workoutId ORDER BY workout_sets.createdAt ASC, workout_sets.id ASC")
+    fun observeSets(workoutId: Long): Flow<List<WorkoutSetEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertWorkout(workout: WorkoutEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertExercise(exercise: ExerciseEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertSet(set: WorkoutSetEntity): Long
+
+    @Query("UPDATE workouts SET endedAt = :endedAt WHERE id = :workoutId AND endedAt IS NULL")
+    suspend fun finishWorkout(workoutId: Long, endedAt: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM workout_sets WHERE id = :setId")
     suspend fun deleteSet(setId: Long)
@@ -63,8 +96,8 @@ interface TrainingDao {
 }
 
 @Database(
-    entities = [ExerciseEntity::class, WorkoutSetEntity::class],
-    version = 1,
+    entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class TrainingDatabase : RoomDatabase() {
@@ -74,13 +107,26 @@ abstract class TrainingDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: TrainingDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val now = System.currentTimeMillis()
+                db.execSQL("CREATE TABLE IF NOT EXISTS workouts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, startedAt INTEGER NOT NULL, endedAt INTEGER)")
+                db.execSQL("INSERT INTO workouts (id, startedAt, endedAt) VALUES (1, $now, $now)")
+                db.execSQL("ALTER TABLE exercises ADD COLUMN workoutId INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_exercises_workoutId ON exercises(workoutId)")
+            }
+        }
+
         fun getInstance(context: Context): TrainingDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     TrainingDatabase::class.java,
                     "stem_training.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { INSTANCE = it }
             }
     }
 }
