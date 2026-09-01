@@ -52,7 +52,7 @@ abstract class TrainingDatabase : RoomDatabase() {
         private val migration3To4 = object : Migration(3, 4) { override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("CREATE TABLE exercises_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, workoutId INTEGER NOT NULL, name TEXT NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY(workoutId) REFERENCES workouts(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
             db.execSQL("INSERT INTO exercises_new (id, workoutId, name, createdAt) SELECT id, workoutId, name, createdAt FROM exercises")
-            db.execSQL("CREATE TABLE workout_sets_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, exerciseId INTEGER NOT NULL, weight REAL NOT NULL, reps INTEGER NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY(exerciseId) REFERENCES exercises_new(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            db.execSQL("CREATE TABLE workout_sets_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, exerciseId INTEGER NOT NULL, weight REAL NOT NULL, reps INTEGER NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY(exerciseId) REFERENCES exercises(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
             db.execSQL("INSERT INTO workout_sets_new (id, exerciseId, weight, reps, createdAt) SELECT id, exerciseId, weight, reps, createdAt FROM workout_sets")
             db.execSQL("DROP TABLE workout_sets")
             db.execSQL("DROP TABLE exercises")
