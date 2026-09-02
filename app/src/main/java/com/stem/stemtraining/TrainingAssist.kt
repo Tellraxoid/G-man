@@ -101,6 +101,7 @@ fun coachAdvice(sets:List<WorkoutSetEntity>,targetReps:Int?):String {
         Text("Тренер · итог тренировки",style=MaterialTheme.typography.titleMedium)
         Text("${sets.count{!it.isWarmup}} рабочих подходов · ${number(sets.filterNot{it.isWarmup}.sumOf{it.weight*it.reps})} кг объёма")
         exercises.forEach{exercise->Text(exercise.name,style=MaterialTheme.typography.titleSmall);Text(coachAdvice(sets.filter{it.exerciseId==exercise.id},exercise.targetReps),style=MaterialTheme.typography.bodySmall)}
-        Text("Локальный анализ по правилам, не внешний ИИ. Сон, питание и состав тела не подключены. Программа не изменяется автоматически.",style=MaterialTheme.typography.labelSmall)
+        HealthConnectPanel(compact=true)
+        Text("Локальный анализ по правилам, не внешний ИИ. Health Connect показывает текущий контекст, а не данные на дату тренировки. Программа не изменяется автоматически.",style=MaterialTheme.typography.labelSmall)
     }}
 }
