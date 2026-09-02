@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -101,6 +104,7 @@ class HealthReader(private val client:HealthConnectClient){
     var metrics by remember{mutableStateOf(emptyList<HealthMetric>())}
     var status by remember{mutableStateOf("")};var busy by remember{mutableStateOf(false)}
     var privacy by remember{mutableStateOf(false)}
+    var detailsExpanded by remember{mutableStateOf(false)}
     val scope=rememberCoroutineScope()
     val launcher=rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()){granted->
         enabled=granted.any{it in healthReadPermissions};prefs.edit().putBoolean("health_enabled",enabled).apply();revision++
@@ -119,26 +123,52 @@ class HealthReader(private val client:HealthConnectClient){
         }
     }
     if(compact && !enabled)return
-    Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-        Text("Health Connect",style=MaterialTheme.typography.titleMedium)
-        Text("Текущие данные · только чтение",style=MaterialTheme.typography.labelSmall)
+    Card(
+        modifier=Modifier.fillMaxWidth(),
+        colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)
+    ){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+        Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+            Column(Modifier.weight(1f)){
+                Text("Данные здоровья",style=MaterialTheme.typography.titleLarge)
+                Text("Health Connect · только чтение",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if(enabled && availability==HealthConnectClient.SDK_AVAILABLE)IconButton({revision++},enabled=!busy){
+                Icon(androidx.compose.material.icons.Icons.Outlined.Refresh,contentDescription="Обновить данные")
+            }
+        }
         if(availability==HealthConnectClient.SDK_UNAVAILABLE)Text("Health Connect недоступен на этом устройстве.")
         else if(availability==HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED)TextButton({runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata")))}}){Text("Установить / обновить Health Connect")}
         else {
-            if(!compact)TextButton({privacy=true}){Text(if(enabled)"Разрешения и использование данных" else "Подключить Health Connect")}
             if(enabled){
                 if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
-                metrics.forEach{m->Text("${m.title}: ${m.value}");if(m.detail.isNotBlank())Text(m.detail,style=MaterialTheme.typography.labelSmall)}
-                Text(status,style=MaterialTheme.typography.labelSmall)
-                TextButton({revision++},enabled=!busy){Text("Обновить")}
-                if(!compact)TextButton({
+                metrics.forEach{HealthMetricCard(it)}
+            }else if(!compact){
+                Text("Вес, сон и питание из ваших приложений — в одном месте.",style=MaterialTheme.typography.bodyMedium)
+                FilledTonalButton({privacy=true}){Text("Подключить Health Connect")}
+            }
+        }
+        if(status.isNotBlank())Text(status,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton({detailsExpanded=!detailsExpanded},modifier=Modifier.fillMaxWidth()){
+            Text(if(detailsExpanded)"Скрыть подробности" else "Подробнее и доступ")
+            Spacer(Modifier.width(6.dp))
+            Icon(if(detailsExpanded)androidx.compose.material.icons.Icons.Outlined.ExpandLess else androidx.compose.material.icons.Icons.Outlined.ExpandMore,contentDescription=null)
+        }
+        if(detailsExpanded){
+            HorizontalDivider()
+            Text("Данные не меняют программу автоматически. Возраст и процент мышц не импортируются. Отсутствие записи не означает нулевое значение.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            metrics.filter{it.detail.isNotBlank()}.forEach{metric->
+                Text(metric.title,style=MaterialTheme.typography.labelMedium)
+                Text(friendlyHealthDetail(metric.detail),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if(!compact && availability==HealthConnectClient.SDK_AVAILABLE){
+                TextButton({privacy=true}){Text("Разрешения и конфиденциальность")}
+                OutlinedButton({runCatching{context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))}.onFailure{status="Откройте Health Connect в настройках Android"}}){Text("Открыть Health Connect")}
+                if(enabled)TextButton({
                     enabled=false;metrics=emptyList();prefs.edit().putBoolean("health_enabled",false).apply()
                     scope.launch{try{HealthConnectClient.getOrCreate(context).permissionController.revokeAllPermissions();status="Отключено"}catch(e:CancellationException){throw e}catch(e:Exception){status="Чтение отключено. Отзовите разрешения в Health Connect."}}
-                }){Text("Отключить")}
+                },colors=ButtonDefaults.textButtonColors(contentColor=MaterialTheme.colorScheme.error)){Text("Отключить доступ")}
             }
-            if(!compact)TextButton({runCatching{context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))}.onFailure{status="Откройте Health Connect в настройках Android"}}){Text("Открыть Health Connect")}
         }
-        Text("Возраст и процент мышц не импортируются. Нет записи ≠ нулевое значение. Показатели не изменяют программу автоматически.",style=MaterialTheme.typography.labelSmall)
     }}
     if(privacy)AlertDialog(onDismissRequest={privacy=false},title={Text("Доступ к данным здоровья")},text={Text(HEALTH_PRIVACY,Modifier.verticalScroll(rememberScrollState()))},confirmButton={TextButton({privacy=false;runCatching{launcher.launch(healthReadPermissions)}.onFailure{status="Не удалось открыть запрос разрешений"}}){Text("Выбрать разрешения")}},dismissButton={TextButton({privacy=false}){Text("Отмена")}})
 }
