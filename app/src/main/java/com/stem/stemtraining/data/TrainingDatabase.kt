@@ -7,8 +7,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "workouts") data class WorkoutEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val startedAt: Long = System.currentTimeMillis(), val endedAt: Long? = null, val notes: String = "")
-@Entity(tableName = "exercises", indices = [Index("workoutId")], foreignKeys = [ForeignKey(entity = WorkoutEntity::class, parentColumns = ["id"], childColumns = ["workoutId"], onDelete = ForeignKey.CASCADE)]) data class ExerciseEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val workoutId: Long, val name: String, val createdAt: Long = System.currentTimeMillis(), val targetSets: Int? = null, val targetReps: Int? = null)
-@Entity(tableName = "workout_sets", indices = [Index("exerciseId")], foreignKeys = [ForeignKey(entity = ExerciseEntity::class, parentColumns = ["id"], childColumns = ["exerciseId"], onDelete = ForeignKey.CASCADE)]) data class WorkoutSetEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val exerciseId: Long, val weight: Double, val reps: Int, val createdAt: Long = System.currentTimeMillis(), val rir: Int? = null, val isWarmup: Boolean = false)
+@Entity(tableName = "exercises", indices = [Index("workoutId")], foreignKeys = [ForeignKey(entity = WorkoutEntity::class, parentColumns = ["id"], childColumns = ["workoutId"], onDelete = ForeignKey.CASCADE)]) data class ExerciseEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val workoutId: Long, val name: String, val createdAt: Long = System.currentTimeMillis(), val targetSets: Int? = null, val targetReps: Int? = null, val supersetNext: Boolean = false)
+@Entity(tableName = "workout_sets", indices = [Index("exerciseId")], foreignKeys = [ForeignKey(entity = ExerciseEntity::class, parentColumns = ["id"], childColumns = ["exerciseId"], onDelete = ForeignKey.CASCADE)]) data class WorkoutSetEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val exerciseId: Long, val weight: Double, val reps: Int, val createdAt: Long = System.currentTimeMillis(), val rir: Int? = null, val isWarmup: Boolean = false, val effort: String? = null)
 @Entity(tableName = "programs") data class ProgramEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val createdAt: Long = System.currentTimeMillis())
 @Entity(tableName = "program_exercises", indices = [Index("programId")], foreignKeys = [ForeignKey(entity = ProgramEntity::class, parentColumns = ["id"], childColumns = ["programId"], onDelete = ForeignKey.CASCADE)]) data class ProgramExerciseEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val programId: Long, val name: String, val position: Int, val targetSets: Int = 3, val targetReps: Int = 10)
 
@@ -39,7 +39,9 @@ data class ProgramWithExercises(@Embedded val program: ProgramEntity, @Relation(
     @Update suspend fun updateWorkout(workout: WorkoutEntity)
     @Query("UPDATE workouts SET endedAt = :endedAt WHERE id = :workoutId") suspend fun finishWorkout(workoutId: Long, endedAt: Long = System.currentTimeMillis())
     @Query("DELETE FROM workout_sets WHERE id = :id") suspend fun deleteSet(id: Long)
-    @Query("DELETE FROM exercises WHERE id = :id") suspend fun deleteExercise(id: Long)
+    @Query("DELETE FROM exercises WHERE id = :id") suspend fun deleteExerciseRow(id: Long)
+    @Query("UPDATE exercises SET supersetNext = 0 WHERE workoutId = (SELECT workoutId FROM exercises WHERE id = :id)") suspend fun clearWorkoutSupersets(id:Long)
+    @Transaction suspend fun deleteExercise(id:Long){clearWorkoutSupersets(id);deleteExerciseRow(id)}
     @Query("DELETE FROM workouts WHERE id = :id") suspend fun deleteWorkout(id: Long)
     @Query("DELETE FROM program_exercises WHERE programId = :programId") suspend fun clearProgramExercises(programId: Long)
     @Query("DELETE FROM programs WHERE id = :id") suspend fun deleteProgram(id: Long)
@@ -58,7 +60,7 @@ data class ProgramWithExercises(@Embedded val program: ProgramEntity, @Relation(
     @Transaction suspend fun saveProgram(program: ProgramEntity, items: List<ProgramExerciseEntity>): Long { val id = if (program.id == 0L) insertProgram(program) else { updateProgram(program); clearProgramExercises(program.id); program.id }; insertProgramExercises(items.mapIndexed { index, item -> item.copy(id = 0, programId = id, position = index) }); return id }
 }
 
-@Database(entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class, ProgramEntity::class, ProgramExerciseEntity::class], version = 6, exportSchema = false)
+@Database(entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class, ProgramEntity::class, ProgramExerciseEntity::class], version = 7, exportSchema = false)
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun trainingDao(): TrainingDao
     companion object {
@@ -79,6 +81,7 @@ abstract class TrainingDatabase : RoomDatabase() {
         } }
         private val migration4To5 = object : Migration(4, 5) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE exercises ADD COLUMN targetSets INTEGER"); db.execSQL("ALTER TABLE exercises ADD COLUMN targetReps INTEGER"); db.execSQL("ALTER TABLE program_exercises ADD COLUMN targetSets INTEGER NOT NULL DEFAULT 3"); db.execSQL("ALTER TABLE program_exercises ADD COLUMN targetReps INTEGER NOT NULL DEFAULT 10") } }
         private val migration5To6 = object : Migration(5, 6) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE workouts ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); db.execSQL("ALTER TABLE workout_sets ADD COLUMN rir INTEGER"); db.execSQL("ALTER TABLE workout_sets ADD COLUMN isWarmup INTEGER NOT NULL DEFAULT 0") } }
-        fun getInstance(context: Context): TrainingDatabase = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, TrainingDatabase::class.java, "stem_training.db").addMigrations(migration1To2, migration2To3, migration3To4, migration4To5, migration5To6).build().also { instance = it } }
+        private val migration6To7 = object : Migration(6, 7) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE exercises ADD COLUMN supersetNext INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE workout_sets ADD COLUMN effort TEXT") } }
+        fun getInstance(context: Context): TrainingDatabase = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, TrainingDatabase::class.java, "stem_training.db").addMigrations(migration1To2, migration2To3, migration3To4, migration4To5, migration5To6, migration6To7).build().also { instance = it } }
     }
 }
