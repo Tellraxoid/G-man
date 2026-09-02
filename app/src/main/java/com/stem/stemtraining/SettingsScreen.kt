@@ -31,7 +31,7 @@ import org.json.JSONObject
         HealthConnectPanel()
         TimerPreferences()
         Text("Данные и упражнения",style=MaterialTheme.typography.titleLarge);OutlinedButton({library=true},Modifier.fillMaxWidth()){Icon(Icons.Rounded.FitnessCenter,null);Text(" Библиотека упражнений")};Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton({export.launch("stem-training-backup.json")},Modifier.weight(1f)){Icon(Icons.Rounded.Upload,null);Text(" Экспорт")};OutlinedButton({import.launch(arrayOf("application/json"))},Modifier.weight(1f)){Icon(Icons.Rounded.Download,null);Text(" Импорт")}}
-        if(status.isNotBlank())Text(status,color=MaterialTheme.colorScheme.secondary,style=MaterialTheme.typography.bodySmall);Text("S.T.E.M. Training 1.5.1 Beta · автоматическая системная копия включена",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(status.isNotBlank())Text(status,color=MaterialTheme.colorScheme.secondary,style=MaterialTheme.typography.bodySmall);Text("S.T.E.M. Training 1.5.2 Beta · автоматическая системная копия включена",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     };if(library)ExerciseLibraryDialog({library=false})
 }
 

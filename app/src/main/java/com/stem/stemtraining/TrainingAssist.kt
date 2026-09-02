@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,31 +21,56 @@ import com.stem.stemtraining.data.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+internal fun restSecondsLeft(end:Long,now:Long):Long = if(end<=now)0 else (end-now+999)/1000
+internal fun restClock(seconds:Long):String = "${seconds/60}:${(seconds%60).toString().padStart(2,'0')}"
+
 object RestAlarm {
+    fun channelId(context:Context):String {
+        val prefs=context.getSharedPreferences("stem_settings",0)
+        return "rest_v2_${prefs.getBoolean("timer_sound",true)}_${prefs.getBoolean("vibration",true)}"
+    }
+    fun ensureChannel(context:Context):String {
+        val prefs=context.getSharedPreferences("stem_settings",0)
+        val sound=prefs.getBoolean("timer_sound",true)
+        val vibration=prefs.getBoolean("vibration",true)
+        val channel=channelId(context)
+        context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(channel,"Окончание отдыха",NotificationManager.IMPORTANCE_HIGH).apply {
+                description="Сигнал и всплывающее уведомление после отдыха между подходами"
+                enableVibration(vibration)
+                setSound(if(sound)android.provider.Settings.System.DEFAULT_NOTIFICATION_URI else null,
+                    android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION).build())
+            })
+        return channel
+    }
+    fun openChannelSettings(context:Context) {
+        val channel=ensureChannel(context)
+        context.startActivity(Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName)
+            .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID,channel))
+    }
     private fun pending(context:Context)=PendingIntent.getBroadcast(context,90,Intent(context,RestAlarmReceiver::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     fun start(context:Context,endsAt:Long) {
-        context.getSharedPreferences("stem_settings",0).edit().putLong("rest_ends",endsAt).apply()
+        context.getSharedPreferences("stem_settings",0).edit().putLong("rest_ends",endsAt).putBoolean("rest_finished",false).apply()
+        NotificationManagerCompat.from(context).cancel(90)
         context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,endsAt,pending(context))
     }
     fun cancel(context:Context) {
         context.getSystemService(AlarmManager::class.java).cancel(pending(context))
-        context.getSharedPreferences("stem_settings",0).edit().remove("rest_ends").apply()
+        NotificationManagerCompat.from(context).cancel(90)
+        context.getSharedPreferences("stem_settings",0).edit().remove("rest_ends").putBoolean("rest_finished",false).apply()
     }
     @Synchronized fun finish(context:Context) {
         val prefs=context.getSharedPreferences("stem_settings",0)
         val end=prefs.getLong("rest_ends",0)
         if(end==0L || end>System.currentTimeMillis())return
         cancel(context)
-        val sound=prefs.getBoolean("timer_sound",true)
-        val vibration=prefs.getBoolean("vibration",true)
-        val channel="rest_v2_${sound}_${vibration}"
-        if(Build.VERSION.SDK_INT>=26)context.getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(channel,"Отдых: звук=$sound, вибрация=$vibration",NotificationManager.IMPORTANCE_HIGH).apply {
-            enableVibration(vibration)
-            if(!sound)setSound(null,null)
-        })
-        val launch=PendingIntent.getActivity(context,91,Intent(context,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        prefs.edit().putBoolean("rest_finished",true).apply()
+        val channel=ensureChannel(context)
+        val launch=PendingIntent.getActivity(context,91,Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         if(Build.VERSION.SDK_INT<33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED) {
-            NotificationManagerCompat.from(context).notify(90,NotificationCompat.Builder(context,channel).setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("Отдых закончен").setContentText("Можно переходить к следующему подходу").setContentIntent(launch).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH).build())
+            // Permission can be revoked between the check and posting; the in-app timer still completes.
+            try { NotificationManagerCompat.from(context).notify(90,NotificationCompat.Builder(context,channel).setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("Отдых закончен").setContentText("Можно переходить к следующему подходу").setContentIntent(launch).setAutoCancel(true).setCategory(NotificationCompat.CATEGORY_ALARM).setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setOnlyAlertOnce(false).setPriority(NotificationCompat.PRIORITY_HIGH).build()) } catch (_:SecurityException) { }
         }
     }
 }
@@ -53,11 +79,44 @@ class RestAlarmReceiver:BroadcastReceiver(){override fun onReceive(context:Conte
 @Composable fun RestTimerBar(){
     val context=LocalContext.current
     val prefs=remember{context.getSharedPreferences("stem_settings",0)}
+    val dao=remember{TrainingDatabase.getInstance(context).trainingDao()}
+    val active by remember{dao.observeActiveWorkout()}.collectAsState(initial=null)
     var end by remember{mutableLongStateOf(prefs.getLong("rest_ends",0))}
+    var finished by remember{mutableStateOf(prefs.getBoolean("rest_finished",false))}
+    var rest by remember{mutableIntStateOf(prefs.getInt("rest",90))}
     var now by remember{mutableLongStateOf(System.currentTimeMillis())}
-    DisposableEffect(prefs){val listener=SharedPreferences.OnSharedPreferenceChangeListener{p,key->if(key=="rest_ends")end=p.getLong(key,0)};prefs.registerOnSharedPreferenceChangeListener(listener);onDispose{prefs.unregisterOnSharedPreferenceChangeListener(listener)}}
+    DisposableEffect(prefs){
+        val listener=SharedPreferences.OnSharedPreferenceChangeListener{p,_->
+            end=p.getLong("rest_ends",0)
+            finished=p.getBoolean("rest_finished",false)
+            rest=p.getInt("rest",90)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        // Resync after registration, including timer changes while this UI was absent.
+        end=prefs.getLong("rest_ends",0);finished=prefs.getBoolean("rest_finished",false);rest=prefs.getInt("rest",90)
+        onDispose{prefs.unregisterOnSharedPreferenceChangeListener(listener)}
+    }
     LaunchedEffect(end){while(end>0){now=System.currentTimeMillis();if(now>=end){RestAlarm.finish(context);break};delay(250)}}
-    if(end>0)Surface(color=MaterialTheme.colorScheme.primaryContainer){Row(Modifier.fillMaxWidth().padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically){val left=((end-now+999)/1000).coerceAtLeast(0);Text("Отдых ${left/60}:${(left%60).toString().padStart(2,'0')}",Modifier.weight(1f));TextButton({RestAlarm.start(context,end+30_000)}){Text("+30 с")};TextButton({RestAlarm.cancel(context)}){Text("Пропустить")}}}
+    if(active!=null || end>0 || finished)Surface(color=MaterialTheme.colorScheme.primaryContainer,shadowElevation=4.dp){
+        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp)){
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                Icon(androidx.compose.material.icons.Icons.Rounded.Timer,contentDescription=null)
+                Column(Modifier.weight(1f)){
+                    Text(if(end>0)"ОТДЫХ" else if(finished)"ОТДЫХ ЗАКОНЧЕН" else "ТАЙМЕР ОТДЫХА",style=MaterialTheme.typography.labelMedium)
+                    Text(if(end>0)restClock(restSecondsLeft(end,now)) else if(finished)"Можно продолжать" else restClock(rest.toLong()),
+                        style=MaterialTheme.typography.titleLarge)
+                }
+                if(end<=0)FilledTonalButton({RestAlarm.start(context,System.currentTimeMillis()+rest*1000L)}){
+                    Text(if(finished)"Ещё отдых" else "Старт")
+                }
+            }
+            if(end>0)Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+                TextButton({RestAlarm.start(context,maxOf(end,System.currentTimeMillis())+30_000)}){Text("+30 с")}
+                TextButton({RestAlarm.cancel(context)}){Text("Пропустить")}
+            }
+            else if(finished)TextButton({RestAlarm.cancel(context)}){Text("Готово")}
+        }
+    }
 }
 
 @Composable fun NumberStepper(value:String,change:(String)->Unit,label:String,step:Double=1.0,integer:Boolean=false){
@@ -75,7 +134,11 @@ class RestAlarmReceiver:BroadcastReceiver(){override fun onReceive(context:Conte
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Звук окончания отдыха",Modifier.weight(1f));Switch(sound,{sound=it;prefs.edit().putBoolean("timer_sound",it).apply()})}
     Text("Шаг изменения веса, кг")
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){listOf(0.5f,1f,2.5f,5f).forEach{value->FilterChip(selected=step==value,onClick={step=value;prefs.edit().putFloat("weight_step",value).apply()},label={Text(value.toString())})}}
-    Text("Для звука и вибрации разрешите уведомления приложения. В фоне Android может задерживать сигнал при энергосбережении.",style=MaterialTheme.typography.bodySmall)
+    Text("Для всплывающего баннера включите уведомления и «Показывать на экране» / «Всплывающие уведомления» в канале окончания отдыха. Режим «Не беспокоить» может скрывать баннер. В фоне Android может задерживать сигнал при энергосбережении.",style=MaterialTheme.typography.bodySmall)
+    TextButton({RestAlarm.openChannelSettings(context)}){Text("Настроить всплывающий баннер")}
+    var testStatus by remember{mutableStateOf("")}
+    TextButton({if(prefs.getLong("rest_ends",0)>System.currentTimeMillis())testStatus="Сначала дождитесь окончания текущего отдыха." else {RestAlarm.start(context,System.currentTimeMillis()+5_000);testStatus="Сверните приложение: сигнал примерно через 5 секунд. В фоне возможна задержка Android."}}){Text("Проверить сигнал через 5 секунд")}
+    if(testStatus.isNotBlank())Text(testStatus,style=MaterialTheme.typography.bodySmall)
     TextButton({context.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName))}){Text("Настройки уведомлений Android")}
 }
 
