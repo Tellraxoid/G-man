@@ -48,7 +48,15 @@ private enum class Page(val title: String) { TRAINING("Тренировка"), H
     val scope = rememberCoroutineScope()
     var page by remember { mutableStateOf(Page.TRAINING) }; val prefs=remember{context.getSharedPreferences("stem_settings",0)};var onboarding by remember{mutableStateOf(!prefs.getBoolean("onboarding_done",false))}
     LaunchedEffect(Unit) { seedPrograms(dao) }
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, bottomBar = { Column { RestTimerBar(); NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) { Page.entries.forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = { Icon(when(item){Page.TRAINING->Icons.Rounded.FitnessCenter;Page.HISTORY->Icons.Rounded.CalendarMonth;Page.PROGRAMS->Icons.Rounded.ViewList;Page.STATS->Icons.Rounded.ShowChart;Page.SETTINGS->Icons.Rounded.Settings}, item.title) }, label = { Text(item.title, maxLines = 1) }, colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)) } } } }) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            Row(Modifier.fillMaxWidth().statusBarsPadding(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { com.stem.integration.StemHub.show(context as android.app.Activity) }) {
+                    Text("S.T.E.M. · Все модули")
+                }
+            }
+        }
+    }, bottomBar = { Column { RestTimerBar(); NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) { Page.entries.forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = { Icon(when(item){Page.TRAINING->Icons.Rounded.FitnessCenter;Page.HISTORY->Icons.Rounded.CalendarMonth;Page.PROGRAMS->Icons.Rounded.ViewList;Page.STATS->Icons.Rounded.ShowChart;Page.SETTINGS->Icons.Rounded.Settings}, item.title) }, label = { Text(item.title, maxLines = 1) }, colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)) } } } }) { padding ->
         Box(Modifier.padding(padding)) {
             when (page) {
                 Page.TRAINING -> TrainingScreen(onPrograms = { page = Page.PROGRAMS })
