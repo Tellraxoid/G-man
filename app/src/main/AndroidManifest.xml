@@ -7,7 +7,12 @@
     <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_NUTRITION" />
-    <queries><package android:name="com.google.android.apps.healthdata" /></queries>
+    <queries>
+        <package android:name="com.stem.companion" />
+        <package android:name="com.stem.stemtraining" />
+        <package android:name="com.stem.nutrition" />
+        <package android:name="com.stem.money" />
+<package android:name="com.google.android.apps.healthdata" /></queries>
 
     <application
         android:allowBackup="true"
