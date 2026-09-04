@@ -33,4 +33,19 @@ class ExerciseIconsTest {
         assertEquals(R.drawable.exercise_decline_crunch, exerciseIcon("Скручивания на обратной скамье"))
         assertEquals(R.drawable.exercise_parallel_bar_leg_raise, exerciseIcon("Подъём ног в висе на брусьях"))
     }
+
+    @Test fun rowsShrugsAndShoulderPressesUseExactEquipment() {
+        assertEquals(R.drawable.exercise_bent_over_barbell_row, exerciseIcon("Тяга штанги в наклоне"))
+        assertEquals(R.drawable.exercise_one_arm_dumbbell_row, exerciseIcon("Тяга в наклоне одной рукой · гантель"))
+        assertEquals(R.drawable.exercise_dumbbell_shrug, exerciseIcon("Шраги · гантели"))
+        assertEquals(R.drawable.exercise_barbell_shrug, exerciseIcon("Шраги · штанга"))
+        assertEquals(R.drawable.exercise_seated_barbell_press, exerciseIcon("Жим сидя · штанга"))
+        assertEquals(R.drawable.exercise_seated_dumbbell_press, exerciseIcon("Жим сидя · гантели"))
+    }
+
+    @Test fun standingAndBentOverRaisesStayDistinct() {
+        assertEquals(R.drawable.exercise_lateral_raise, exerciseIcon("Разведение рук с гантелями стоя"))
+        assertEquals(R.drawable.exercise_bent_over_reverse_fly, exerciseIcon("Разведение рук с гантелями в стороны в наклоне"))
+        assertNotEquals(exerciseIcon("Разведение рук с гантелями стоя"), exerciseIcon("Разведение рук с гантелями в стороны в наклоне"))
+    }
 }

@@ -1,14 +1,12 @@
-# S.T.E.M. Training 1.5.2 Beta
+# S.T.E.M. Training 1.6 Beta
 
-- Rest timer stays visible above navigation during an active workout, even before starting or after skipping rest.
-- Manual start, large countdown, +30 seconds, skip and persistent completion state.
-- Working-set auto-start and superset behavior preserved.
-- Rest completion notification uses the existing high-importance channel, alarm category and explicit sound configuration for newly created channels. Existing user notification preferences remain respected.
-- Direct shortcut to the timer channel settings and a 5-second signal check (does not replace a running rest timer).
-- Restarting/skipping clears stale notifications; permission revocation does not crash completion.
+- Added five catalog exercises with dedicated illustrations: bent-over barbell row, one-arm dumbbell row, dumbbell shrugs, barbell shrugs, and bent-over dumbbell reverse fly.
+- Replaced the shared shoulder-press picture with separate, equipment-accurate seated barbell and seated dumbbell press illustrations.
+- Renamed the standing lateral raise to «Разведение рук с гантелями стоя».
+- Existing workout and program rows using the old lateral-raise and barbell-row names are renamed safely during database migration.
+- All seven new illustrations use a white background, black/lime visual system, movement arrows and highlighted working muscles.
+- Specific-first icon routing keeps barbell, dumbbell, standing and bent-over variants separate.
 
-Heads-up banners depend on Android/device notification settings and Do Not Disturb. Enable floating notifications in the rest completion channel. Background alarms remain inexact and can be delayed by Android battery management. No full-screen overlays or new permissions.
+Install over the existing app without uninstalling it. Workouts and programs are preserved.
 
-Install over the existing app without uninstalling. No workout database changes.
-
-Verification: release build and JVM tests; physical-device banner and timer visibility require checking on your phone.
+Verification: release build and JVM tests. Illustrations were visually checked after final 512×512 WebP conversion.

@@ -60,7 +60,7 @@ data class ProgramWithExercises(@Embedded val program: ProgramEntity, @Relation(
     @Transaction suspend fun saveProgram(program: ProgramEntity, items: List<ProgramExerciseEntity>): Long { val id = if (program.id == 0L) insertProgram(program) else { updateProgram(program); clearProgramExercises(program.id); program.id }; insertProgramExercises(items.mapIndexed { index, item -> item.copy(id = 0, programId = id, position = index) }); return id }
 }
 
-@Database(entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class, ProgramEntity::class, ProgramExerciseEntity::class], version = 7, exportSchema = false)
+@Database(entities = [WorkoutEntity::class, ExerciseEntity::class, WorkoutSetEntity::class, ProgramEntity::class, ProgramExerciseEntity::class], version = 8, exportSchema = false)
 abstract class TrainingDatabase : RoomDatabase() {
     abstract fun trainingDao(): TrainingDao
     companion object {
@@ -82,6 +82,12 @@ abstract class TrainingDatabase : RoomDatabase() {
         private val migration4To5 = object : Migration(4, 5) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE exercises ADD COLUMN targetSets INTEGER"); db.execSQL("ALTER TABLE exercises ADD COLUMN targetReps INTEGER"); db.execSQL("ALTER TABLE program_exercises ADD COLUMN targetSets INTEGER NOT NULL DEFAULT 3"); db.execSQL("ALTER TABLE program_exercises ADD COLUMN targetReps INTEGER NOT NULL DEFAULT 10") } }
         private val migration5To6 = object : Migration(5, 6) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE workouts ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); db.execSQL("ALTER TABLE workout_sets ADD COLUMN rir INTEGER"); db.execSQL("ALTER TABLE workout_sets ADD COLUMN isWarmup INTEGER NOT NULL DEFAULT 0") } }
         private val migration6To7 = object : Migration(6, 7) { override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE exercises ADD COLUMN supersetNext INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE workout_sets ADD COLUMN effort TEXT") } }
-        fun getInstance(context: Context): TrainingDatabase = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, TrainingDatabase::class.java, "stem_training.db").addMigrations(migration1To2, migration2To3, migration3To4, migration4To5, migration5To6, migration6To7).build().also { instance = it } }
+        private val migration7To8 = object : Migration(7, 8) { override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("UPDATE exercises SET name = 'Разведение рук с гантелями стоя' WHERE name = 'Разведение рук в стороны · гантели'")
+            db.execSQL("UPDATE program_exercises SET name = 'Разведение рук с гантелями стоя' WHERE name = 'Разведение рук в стороны · гантели'")
+            db.execSQL("UPDATE exercises SET name = 'Тяга штанги в наклоне' WHERE name = 'Тяга в наклоне · штанга'")
+            db.execSQL("UPDATE program_exercises SET name = 'Тяга штанги в наклоне' WHERE name = 'Тяга в наклоне · штанга'")
+        } }
+        fun getInstance(context: Context): TrainingDatabase = instance ?: synchronized(this) { instance ?: Room.databaseBuilder(context.applicationContext, TrainingDatabase::class.java, "stem_training.db").addMigrations(migration1To2, migration2To3, migration3To4, migration4To5, migration5To6, migration6To7, migration7To8).build().also { instance = it } }
     }
 }
