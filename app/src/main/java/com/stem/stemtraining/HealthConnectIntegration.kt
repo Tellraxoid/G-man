@@ -36,7 +36,7 @@ import java.time.Duration
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-const val HEALTH_PRIVACY = "Health Connect: только чтение веса, процента жира, сна и питания после вашего разрешения. Показатели отображаются как контекст к тренировкам, не служат диагнозом и не меняют программу автоматически. Записи загружаются только при открытом экране и хранятся в памяти до его закрытия. Внешнему ИИ, серверам, рекламе и аналитике они не передаются; в резервные копии и JSON-экспорт приложения не включаются. Доступ можно отозвать в Health Connect или кнопкой «Отключить». Исходные записи при отключении не удаляются. Приложения часов, весов и питания должны самостоятельно записывать данные в Health Connect."
+const val HEALTH_PRIVACY = "Health Connect: только чтение веса, процента жира, безжировой массы, сна и питания после вашего разрешения. При разрешении истории приложение ищет последние доступные записи до 365 дней назад. Показатели отображаются как контекст к тренировкам, не служат диагнозом и не меняют программу автоматически. Записи загружаются только при открытом экране и хранятся в памяти до его закрытия. Внешнему ИИ, серверам, рекламе и аналитике они не передаются; в резервные копии и JSON-экспорт приложения не включаются. Доступ можно отозвать в Health Connect или кнопкой «Отключить». Исходные записи при отключении не удаляются. Приложения часов, весов и питания должны самостоятельно записывать поддерживаемые данные в Health Connect."
 
 class HealthPrivacyActivity:ComponentActivity(){
     override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{STEMTrainingTheme{Surface(Modifier.fillMaxSize()){Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())){Text("Данные здоровья",style=MaterialTheme.typography.headlineSmall);Spacer(Modifier.height(16.dp));Text(HEALTH_PRIVACY);TextButton({finish()}){Text("Закрыть")}}}}}}
@@ -52,25 +52,32 @@ internal fun maskRevokedHealth(metrics:List<HealthMetric>,permissions:List<Strin
 val healthReadPermissions=setOf(
     HealthPermission.getReadPermission(WeightRecord::class),
     HealthPermission.getReadPermission(BodyFatRecord::class),
+    HealthPermission.getReadPermission(LeanBodyMassRecord::class),
     HealthPermission.getReadPermission(SleepSessionRecord::class),
-    HealthPermission.getReadPermission(NutritionRecord::class)
+    HealthPermission.getReadPermission(NutritionRecord::class),
+    HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
 )
 fun healthTime(time:Instant):String=DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZoneId.systemDefault()).format(time)
 
 class HealthReader(private val client:HealthConnectClient){
     suspend fun read(now:Instant=Instant.now()):List<HealthMetric>{
         val granted=client.permissionController.getGrantedPermissions()
-        val month=TimeRangeFilter.between(now.minus(Duration.ofDays(29)),now)
+        val rangeDays=if(HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY in granted)365L else 29L
+        val historyRange=TimeRangeFilter.between(now.minus(Duration.ofDays(rangeDays)),now)
         suspend fun metric(title:String,permission:String,block:suspend ()->HealthMetric):HealthMetric{
             return permittedHealthMetric(title,permission,granted,block)
         }
         val weight=metric("Вес",HealthPermission.getReadPermission(WeightRecord::class)){
-            val r=client.readRecords(ReadRecordsRequest(WeightRecord::class,month,ascendingOrder=false,pageSize=1)).records.firstOrNull()
-            if(r==null)HealthMetric("Вес","Нет записей за 29 дней") else HealthMetric("Вес","${number(r.weight.inKilograms)} кг","${healthTime(r.time)} · ${r.metadata.dataOrigin.packageName}")
+            val r=client.readRecords(ReadRecordsRequest(WeightRecord::class,historyRange,ascendingOrder=false,pageSize=1)).records.firstOrNull()
+            if(r==null)HealthMetric("Вес","Нет записей за $rangeDays дней") else HealthMetric("Вес","${number(r.weight.inKilograms)} кг","${healthTime(r.time)} · ${r.metadata.dataOrigin.packageName}")
         }
         val fat=metric("Жир",HealthPermission.getReadPermission(BodyFatRecord::class)){
-            val r=client.readRecords(ReadRecordsRequest(BodyFatRecord::class,month,ascendingOrder=false,pageSize=1)).records.firstOrNull()
-            if(r==null)HealthMetric("Жир","Нет записей за 29 дней") else HealthMetric("Жир","${number(r.percentage.value)} %","${healthTime(r.time)} · ${r.metadata.dataOrigin.packageName}")
+            val r=client.readRecords(ReadRecordsRequest(BodyFatRecord::class,historyRange,ascendingOrder=false,pageSize=1)).records.firstOrNull()
+            if(r==null)HealthMetric("Жир","Нет записей за $rangeDays дней") else HealthMetric("Жир","${number(r.percentage.value)} %","${healthTime(r.time)} · ${r.metadata.dataOrigin.packageName}")
+        }
+        val lean=metric("Безжировая масса",HealthPermission.getReadPermission(LeanBodyMassRecord::class)){
+            val r=client.readRecords(ReadRecordsRequest(LeanBodyMassRecord::class,historyRange,ascendingOrder=false,pageSize=1)).records.firstOrNull()
+            if(r==null)HealthMetric("Безжировая масса","Нет записей за $rangeDays дней") else HealthMetric("Безжировая масса","${number(r.mass.inKilograms)} кг","${healthTime(r.time)} · ${r.metadata.dataOrigin.packageName}. Health Connect не хранит отдельный показатель процента мышц.")
         }
         val sleep=metric("Сон за последние 24 часа",HealthPermission.getReadPermission(SleepSessionRecord::class)){
             val from=now.minus(Duration.ofHours(24))
@@ -87,9 +94,10 @@ class HealthReader(private val client:HealthConnectClient){
         }
         // Recheck after reads: never retain data for permissions revoked during the request.
         val finalGranted=client.permissionController.getGrantedPermissions()
-        return maskRevokedHealth(listOf(weight,fat,sleep,nutrition),listOf(
+        return maskRevokedHealth(listOf(weight,fat,lean,sleep,nutrition),listOf(
             HealthPermission.getReadPermission(WeightRecord::class),HealthPermission.getReadPermission(BodyFatRecord::class),
-            HealthPermission.getReadPermission(SleepSessionRecord::class),HealthPermission.getReadPermission(NutritionRecord::class)
+            HealthPermission.getReadPermission(LeanBodyMassRecord::class),HealthPermission.getReadPermission(SleepSessionRecord::class),
+            HealthPermission.getReadPermission(NutritionRecord::class)
         ),finalGranted)
     }
 }
@@ -143,7 +151,7 @@ class HealthReader(private val client:HealthConnectClient){
                 if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
                 metrics.forEach{HealthMetricCard(it)}
             }else if(!compact){
-                Text("Вес, сон и питание из ваших приложений — в одном месте.",style=MaterialTheme.typography.bodyMedium)
+                Text("Вес, жир, безжировая масса, сон и питание из ваших приложений — в одном месте.",style=MaterialTheme.typography.bodyMedium)
                 FilledTonalButton({privacy=true}){Text("Подключить Health Connect")}
             }
         }
@@ -155,7 +163,7 @@ class HealthReader(private val client:HealthConnectClient){
         }
         if(detailsExpanded){
             HorizontalDivider()
-            Text("Данные не меняют программу автоматически. Возраст и процент мышц не импортируются. Отсутствие записи не означает нулевое значение.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Данные не меняют программу автоматически. Health Connect не имеет отдельного типа для процента мышц, поэтому показываем безжировую массу, если источник её передаёт. Отсутствие записи не означает нулевое значение.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             metrics.filter{it.detail.isNotBlank()}.forEach{metric->
                 Text(metric.title,style=MaterialTheme.typography.labelMedium)
                 Text(friendlyHealthDetail(metric.detail),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
