@@ -1,4 +1,4 @@
-package com.stem.stemtraining
+﻿package com.stem.stemtraining
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -39,6 +39,7 @@ import java.util.*
     var addingSetFor by remember { mutableStateOf<ExerciseEntity?>(null) }
     var addingExerciseTo by remember { mutableStateOf<WorkoutEntity?>(null) }
     var exerciseGuideName by remember { mutableStateOf<String?>(null) }
+    var programPickerFor by remember { mutableStateOf<WorkoutEntity?>(null) }
 
     val workoutsByDay = remember(workouts) { workouts.groupBy { dayStart(it.startedAt) } }
     val selectedWorkouts = workoutsByDay[selectedDay].orEmpty()
@@ -102,6 +103,7 @@ import java.util.*
                     HorizontalDivider(); Spacer(Modifier.height(6.dp))
                 }
                 item {
+                    Button({ programPickerFor = workout }, Modifier.fillMaxWidth()) { Icon(Icons.Rounded.Add, null); Text(" Добавить программу") }
                     OutlinedButton({ addingExerciseTo = workout }, Modifier.fillMaxWidth()) { Icon(Icons.Rounded.Add, null); Text(" Добавить упражнение") }
                     Text("Нажмите на подход, чтобы изменить или удалить", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TextButton({ scope.launch { dao.deleteWorkout(workout.id) }; details = null }) { Text("Удалить тренировку", color = MaterialTheme.colorScheme.error) }
@@ -113,6 +115,7 @@ import java.util.*
     addingSetFor?.let { exercise -> SetDialog(null, { addingSetFor = null }, { weight, reps, rir, warmup -> scope.launch { dao.insertSet(WorkoutSetEntity(exerciseId = exercise.id, weight = weight, reps = reps, rir = rir, isWarmup = warmup)) }; addingSetFor = null }, isNew = true) }
     addingExerciseTo?.let { workout -> val existing by dao.observeExercises(workout.id).collectAsState(initial = emptyList()); ExerciseCatalogDialog(existing.map { it.name }.toSet(), { addingExerciseTo = null }) { name -> scope.launch { dao.insertExercise(ExerciseEntity(workoutId = workout.id, name = name)) }; addingExerciseTo = null } }
     exerciseGuideName?.let { name -> ExerciseDetailsDialog(name) { exerciseGuideName = null } }
+    programPickerFor?.let { workout -> ProgramPickerDialog(dao, { programPickerFor = null }) { program -> scope.launch { program.exercises.sortedBy { it.position }.forEach { item -> dao.insertExercise(ExerciseEntity(workoutId = workout.id, name = item.name, targetSets = item.targetSets, targetReps = item.targetReps)) } }; programPickerFor = null; details = workout } }
 }
 
 @Composable private fun ColumnScope.CalendarGrid(days: List<Long?>, selectedDay: Long, workouts: Map<Long, List<WorkoutEntity>>, select: (Long) -> Unit) {
@@ -182,3 +185,17 @@ private fun monthGrid(firstDay: Long): List<Long?> {
 }
 private fun dayStart(time: Long): Long = Calendar.getInstance().apply { timeInMillis = time; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
 private fun historicalWorkoutTimes(day: Long): Pair<Long, Long> { val now = System.currentTimeMillis(); if (dayStart(now) == day) return (now - 3_600_000L) to now; val end = Calendar.getInstance().apply { timeInMillis = day; set(Calendar.HOUR_OF_DAY, 19); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis; return (end - 3_600_000L) to end }
+
+
+
+@Composable private fun ProgramPickerDialog(dao: TrainingDao, dismiss: () -> Unit, select: (ProgramWithExercises) -> Unit) {
+    val programs by dao.observePrograms().collectAsState(initial = emptyList())
+    AlertDialog(onDismissRequest = dismiss, title = { Text("Добавить программу") }, text = { LazyColumn {
+        if (programs.isEmpty()) item { Text("Сначала создайте программу во вкладке «Программы».") }
+        items(programs, key = { it.program.id }) { program ->
+            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { select(program) }) {
+                Column(Modifier.padding(14.dp)) { Text(program.program.name, fontWeight = FontWeight.Bold); Text("${program.exercises.size} упражнений", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+    } }, confirmButton = {}, dismissButton = { TextButton(dismiss) { Text("Отмена") } })
+}
