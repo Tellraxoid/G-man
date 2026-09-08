@@ -8,7 +8,6 @@
     <uses-permission android:name="android.permission.health.READ_LEAN_BODY_MASS" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
-    <uses-permission android:name="android.permission.health.READ_NUTRITION" />
     <uses-permission android:name="com.stem.nutrition.permission.READ_SUMMARY" />
     <queries>
         <package android:name="com.google.android.apps.healthdata" />

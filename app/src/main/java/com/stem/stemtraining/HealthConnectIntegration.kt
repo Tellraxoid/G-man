@@ -55,7 +55,6 @@ val healthReadPermissions=setOf(
     HealthPermission.getReadPermission(BodyFatRecord::class),
     HealthPermission.getReadPermission(LeanBodyMassRecord::class),
     HealthPermission.getReadPermission(SleepSessionRecord::class),
-    HealthPermission.getReadPermission(NutritionRecord::class),
     HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
 )
 fun healthTime(time:Instant):String=DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZoneId.systemDefault()).format(time)
@@ -102,19 +101,11 @@ class HealthReader(private val client:HealthConnectClient){
             val duration=r[SleepSessionRecord.SLEEP_DURATION_TOTAL]
             if(duration==null)HealthMetric("Сон за последние 24 часа","Нет данных") else HealthMetric("Сон за последние 24 часа","${duration.toMinutes()/60} ч ${duration.toMinutes()%60} мин","${healthTime(from)} — ${healthTime(now)} · ${r.dataOrigins.joinToString{it.packageName}}")
         }
-        val nutrition=metric("Последняя запись питания",HealthPermission.getReadPermission(NutritionRecord::class)){
-            val r=client.readRecords(ReadRecordsRequest(NutritionRecord::class,TimeRangeFilter.between(now.minus(Duration.ofDays(7)),now),ascendingOrder=false,pageSize=1)).records.firstOrNull()
-            if(r==null)HealthMetric("Последняя запись питания","Нет записей за 7 дней") else {
-                val fields=listOfNotNull(r.energy?.let{"${number(it.inKilocalories)} ккал"},r.protein?.let{"белок ${number(it.inGrams)} г"},r.totalCarbohydrate?.let{"углеводы ${number(it.inGrams)} г"},r.totalFat?.let{"жиры ${number(it.inGrams)} г"})
-                HealthMetric("Последняя запись питания",fields.joinToString(" · ").ifEmpty{"Калории и БЖУ не заполнены"},"${healthTime(r.endTime)} · ${r.metadata.dataOrigin.packageName}. Это запись, не суточная сумма.")
-            }
-        }
         // Recheck after reads: never retain data for permissions revoked during the request.
         val finalGranted=client.permissionController.getGrantedPermissions()
-        return maskRevokedHealth(listOf(weight,fat,lean,sleep,nutrition),listOf(
+        return maskRevokedHealth(listOf(weight,fat,lean,sleep),listOf(
             HealthPermission.getReadPermission(WeightRecord::class),HealthPermission.getReadPermission(BodyFatRecord::class),
-            HealthPermission.getReadPermission(LeanBodyMassRecord::class),HealthPermission.getReadPermission(SleepSessionRecord::class),
-            HealthPermission.getReadPermission(NutritionRecord::class)
+            HealthPermission.getReadPermission(LeanBodyMassRecord::class),HealthPermission.getReadPermission(SleepSessionRecord::class)
         ),finalGranted)
     }
 }
