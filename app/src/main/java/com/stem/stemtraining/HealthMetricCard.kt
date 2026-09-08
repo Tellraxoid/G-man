@@ -46,8 +46,10 @@ internal fun HealthMetricCard(metric: HealthMetric) {
     val (label, icon) = when (metric.title) {
         "Вес" -> "Вес" to Icons.Outlined.MonitorWeight
         "Жир" -> "Процент жира" to Icons.Outlined.Percent
+        "Безжировая масса" -> "Безжировая масса" to Icons.Outlined.FitnessCenter
         "Сон за последние 24 часа" -> "Сон" to Icons.Outlined.Bedtime
-        else -> "Питание" to Icons.Outlined.Restaurant
+        "S.T.E.M. Nutrition" -> "Питание" to Icons.Outlined.Restaurant
+        else -> metric.title to Icons.Outlined.Info
     }
     val hasReading = metric.detail.isNotBlank()
     val subtitle = when (metric.title) {
