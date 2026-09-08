@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import org.json.JSONObject
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,6 +59,22 @@ val healthReadPermissions=setOf(
     HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
 )
 fun healthTime(time:Instant):String=DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZoneId.systemDefault()).format(time)
+
+fun readStemNutrition(context:Context):HealthMetric{
+    return try{
+        context.contentResolver.query(Uri.parse("content://com.stem.nutrition.summary/summary"),null,null,null,null)?.use{cursor->
+            if(!cursor.moveToFirst())return HealthMetric("S.T.E.M. Nutrition","Нет данных за сегодня")
+            val json=JSONObject(cursor.getString(cursor.getColumnIndexOrThrow("summary_json")))
+            if(json.optString("state")!="READY")return HealthMetric("S.T.E.M. Nutrition","Нет данных за сегодня","Связь с S.T.E.M. Nutrition работает")
+            val parts=mutableListOf<String>()
+            if(!json.isNull("calories"))parts += "${number(json.getDouble("calories"))} ккал"
+            if(!json.isNull("protein_g"))parts += "белок ${number(json.getDouble("protein_g"))} г"
+            val count=json.optInt("entry_count",0)
+            HealthMetric("S.T.E.M. Nutrition",parts.joinToString(" · ").ifEmpty{"Есть записи"},"Сегодня · $count записей · прямой обмен между приложениями")
+        } ?: HealthMetric("S.T.E.M. Nutrition","Приложение не отвечает")
+    }catch(e:SecurityException){HealthMetric("S.T.E.M. Nutrition","Нет доступа","Нужно обновить оба S.T.E.M. приложения одной подписью")}
+    catch(e:Exception){HealthMetric("S.T.E.M. Nutrition","Связь недоступна")}
+}
 
 class HealthReader(private val client:HealthConnectClient){
     suspend fun read(now:Instant=Instant.now()):List<HealthMetric>{
@@ -124,7 +141,7 @@ class HealthReader(private val client:HealthConnectClient){
         availability=HealthConnectClient.getSdkStatus(context)
         if(enabled && availability==HealthConnectClient.SDK_AVAILABLE){
             busy=true
-            try{metrics=HealthReader(HealthConnectClient.getOrCreate(context)).read();status="Обновлено: ${healthTime(Instant.now())}"}
+            try{metrics=HealthReader(HealthConnectClient.getOrCreate(context)).read()+readStemNutrition(context);status="Обновлено: ${healthTime(Instant.now())}"}
             catch(e:CancellationException){throw e}
             catch(e:Exception){status="Health Connect недоступен или доступ отозван. Проверьте разрешения."}
             finally{busy=false}
