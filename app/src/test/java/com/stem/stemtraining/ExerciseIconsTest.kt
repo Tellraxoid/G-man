@@ -2,9 +2,26 @@ package com.stem.stemtraining
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExerciseIconsTest {
+    @Test fun screenshotExerciseVariantsHaveDedicatedImages(){
+        val names=listOf(
+            "Подъём на носки сидя · тренажёр",
+            "Разгибание рук в наклоне · гантели",
+            "Жим лёжа на наклонной скамье · тренажёр Смита",
+            "Жим от груди сидя · тренажёр",
+            "Сведение рук стоя · верхний блок",
+            "Концентрированное сгибание обратным хватом · гантель",
+            "Приседания · тренажёр Смита",
+            "Горизонтальная рычажная тяга",
+            "Подъём рук в стороны · нижний блок",
+            "Жим над головой · тренажёр Смита"
+        )
+        assertEquals(names.size,names.map(::exerciseIcon).distinct().size)
+        assertTrue(names.all{exerciseIcon(it)!=R.drawable.exercise_generic})
+    }
     @Test fun chestPressVariantsUseTheirOwnIllustrations() {
         assertEquals(R.drawable.exercise_bench, exerciseIcon("Жим лёжа · штанга"))
         assertEquals(R.drawable.exercise_dumbbell_bench, exerciseIcon("Жим лёжа · гантели"))

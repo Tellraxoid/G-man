@@ -1,14 +1,24 @@
-# S.T.E.M. Training 1.7 Beta
+# S.T.E.M. Training 1.8 Beta
 
-- Tap an exercise image in an active workout, catalog, program or history to open a detailed technique card with muscles, execution and common mistakes.
-- Dedicated close-grip barbell bench-press illustration and new lying barbell triceps-extension exercise with its own illustration.
-- Estimated 1RM calculator using the Epley formula in Progress. One-repetition sets remain equal to the lifted weight.
-- Per-exercise 1RM history and chart remain in the separate Progress section; warm-up sets are excluded from records and charts.
-- Next-session load suggestion uses every working set from the latest completed workout: any Heavy or missing rating keeps the main weight; Normal adds one configured step; all Easy adds two steps.
-- A newly added set never inherits the warm-up check from the previous set. Existing sets can still be edited normally.
-- Mi Fitness is recognized as a readable Health Connect source when it writes a WeightRecord. No private Mi Fitness storage or unofficial API is accessed.
-- No destructive database migration. Existing workouts, programs, sets, effort labels and Health Connect preferences are preserved when installing over the current app.
+## Новые упражнения
 
-Install over the existing app without uninstalling it.
+- Подъём на носки сидя в тренажёре.
+- Разгибание рук в наклоне с гантелями.
+- Жим лёжа на наклонной скамье в тренажёре Смита.
+- Жим от груди сидя в тренажёре.
+- Сведение рук стоя с верхних блоков.
+- Концентрированное сгибание обратным хватом с гантелью.
+- Приседания в тренажёре Смита.
+- Горизонтальная рычажная тяга.
+- Подъём рук в стороны с нижнего блока.
+- Жим над головой в тренажёре Смита.
 
-Verification: release build and JVM tests. Two final 512×512 WebP illustrations were visually checked after conversion.
+Каждому варианту назначена отдельная иллюстрация на белом фоне с правильным тренажёром, хватом и выделением работающих мышц. Уже существующие аналоги из предоставленного списка сохранены без дублирования.
+
+## Данные приложений
+
+- Суточные калории, белок, вода и цели читаются напрямую из подписанного приложения S.T.E.M. Nutrition.
+- Названия блюд и личный профиль не передаются.
+- Вес, процент жира и сон продолжают читаться через Health Connect — Mi Fitness не предоставляет публичного прямого API для этих данных.
+
+Обновление устанавливается поверх предыдущей версии. База тренировок, история и программы не удаляются.

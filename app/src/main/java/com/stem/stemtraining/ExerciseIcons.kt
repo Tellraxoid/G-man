@@ -3,6 +3,16 @@ package com.stem.stemtraining
 import androidx.annotation.DrawableRes
 
 @DrawableRes fun exerciseIcon(name:String):Int=when{
+    name.contains("подъём на носки сидя",true)->R.drawable.exercise_seated_calf_machine
+    name.contains("разгибание рук в наклоне",true)&&name.contains("гантел",true)->R.drawable.exercise_dumbbell_triceps_kickback
+    name.contains("наклонной скамье",true)&&name.contains("Смита",true)->R.drawable.exercise_incline_smith_press
+    name.contains("жим от груди сидя",true)&&name.contains("тренаж",true)->R.drawable.exercise_seated_chest_press_machine
+    name.contains("сведение рук стоя",true)&&name.contains("блок",true)->R.drawable.exercise_standing_cable_crossover
+    name.contains("концентрирован",true)&&name.contains("обратным хватом",true)->R.drawable.exercise_reverse_concentration_curl
+    name.contains("присед",true)&&name.contains("Смита",true)->R.drawable.exercise_smith_squat
+    name.contains("горизонтальная рычажная тяга",true)->R.drawable.exercise_horizontal_lever_row
+    name.contains("подъём рук в стороны",true)&&name.contains("нижний блок",true)->R.drawable.exercise_low_cable_lateral_raise
+    name.contains("жим над головой",true)&&name.contains("Смита",true)->R.drawable.exercise_smith_overhead_press
     name.contains("скручивания на обратной скамье",true)->R.drawable.exercise_decline_crunch
     name.contains("подъём ног в висе на брусьях",true)->R.drawable.exercise_parallel_bar_leg_raise
     name.contains("скамье Скотта",true)->R.drawable.exercise_preacher_curl
