@@ -48,4 +48,10 @@ class ExerciseIconsTest {
         assertEquals(R.drawable.exercise_bent_over_reverse_fly, exerciseIcon("Разведение рук с гантелями в стороны в наклоне"))
         assertNotEquals(exerciseIcon("Разведение рук с гантелями стоя"), exerciseIcon("Разведение рук с гантелями в стороны в наклоне"))
     }
+
+    @Test fun tricepsBarbellExercisesUseDedicatedIllustrations() {
+        assertEquals(R.drawable.exercise_close_grip_bench_press, exerciseIcon("Жим лёжа узким хватом · штанга"))
+        assertEquals(R.drawable.exercise_lying_barbell_triceps_extension, exerciseIcon("Разгибание рук со штангой лёжа"))
+        assertNotEquals(exerciseIcon("Жим лёжа · штанга"),exerciseIcon("Жим лёжа узким хватом · штанга"))
+    }
 }

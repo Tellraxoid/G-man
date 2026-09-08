@@ -1,12 +1,14 @@
-# S.T.E.M. Training 1.6 Beta
+# S.T.E.M. Training 1.7 Beta
 
-- Added five catalog exercises with dedicated illustrations: bent-over barbell row, one-arm dumbbell row, dumbbell shrugs, barbell shrugs, and bent-over dumbbell reverse fly.
-- Replaced the shared shoulder-press picture with separate, equipment-accurate seated barbell and seated dumbbell press illustrations.
-- Renamed the standing lateral raise to «Разведение рук с гантелями стоя».
-- Existing workout and program rows using the old lateral-raise and barbell-row names are renamed safely during database migration.
-- All seven new illustrations use a white background, black/lime visual system, movement arrows and highlighted working muscles.
-- Specific-first icon routing keeps barbell, dumbbell, standing and bent-over variants separate.
+- Tap an exercise image in an active workout, catalog, program or history to open a detailed technique card with muscles, execution and common mistakes.
+- Dedicated close-grip barbell bench-press illustration and new lying barbell triceps-extension exercise with its own illustration.
+- Estimated 1RM calculator using the Epley formula in Progress. One-repetition sets remain equal to the lifted weight.
+- Per-exercise 1RM history and chart remain in the separate Progress section; warm-up sets are excluded from records and charts.
+- Next-session load suggestion uses every working set from the latest completed workout: any Heavy or missing rating keeps the main weight; Normal adds one configured step; all Easy adds two steps.
+- A newly added set never inherits the warm-up check from the previous set. Existing sets can still be edited normally.
+- Mi Fitness is recognized as a readable Health Connect source when it writes a WeightRecord. No private Mi Fitness storage or unofficial API is accessed.
+- No destructive database migration. Existing workouts, programs, sets, effort labels and Health Connect preferences are preserved when installing over the current app.
 
-Install over the existing app without uninstalling it. Workouts and programs are preserved.
+Install over the existing app without uninstalling it.
 
-Verification: release build and JVM tests. Illustrations were visually checked after final 512×512 WebP conversion.
+Verification: release build and JVM tests. Two final 512×512 WebP illustrations were visually checked after conversion.

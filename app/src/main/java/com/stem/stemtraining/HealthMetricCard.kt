@@ -16,7 +16,8 @@ internal fun friendlyHealthDetail(detail: String): String {
         "com.google.android.apps.fitness" to "Google Fit",
         "com.mi.health" to "Mi Health",
         "com.sec.android.app.shealth" to "Samsung Health",
-        "com.fitbit.FitbitMobile" to "Fitbit"
+        "com.fitbit.FitbitMobile" to "Fitbit",
+        "com.xiaomi.wearable" to "Mi Fitness"
     )
     // Exact package tokens only; unknown sources remain identifiable.
     return Regex("[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+")

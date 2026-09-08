@@ -13,6 +13,8 @@ import androidx.annotation.DrawableRes
     name.contains("наклонной скамье",true)&&name.contains("гантел",true)->R.drawable.exercise_incline_dumbbell_press
     name.contains("наклонной скамье",true)&&name.contains("штанг",true)->R.drawable.exercise_incline_barbell_press
     name.contains("жим лёжа",true)&&name.contains("гантел",true)->R.drawable.exercise_dumbbell_bench
+    name.contains("разгибание",true)&&name.contains("лёжа",true)&&name.contains("штанг",true)->R.drawable.exercise_lying_barbell_triceps_extension
+    name.contains("жим лёжа",true)&&name.contains("узким хватом",true)->R.drawable.exercise_close_grip_bench_press
     name.contains("отжим",true)->R.drawable.exercise_pushup
     name.contains("тяга верхнего блока",true)->R.drawable.exercise_lat_pulldown
     name.contains("тяга горизонтального блока",true)->R.drawable.exercise_seated_row
