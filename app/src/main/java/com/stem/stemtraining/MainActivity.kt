@@ -127,7 +127,9 @@ val exerciseCatalog = listOf(
     val previous by dao.observePreviousSet(exercise.name).collectAsState(initial=null)
     val previousSets by dao.observePreviousWorkingSets(exercise.name).collectAsState(initial=emptyList())
     var details by remember(exercise.name){mutableStateOf(false)}
-    val suggestion=suggestedNextWeight(previousSets,context.getSharedPreferences("stem_settings",0).getFloat("weight_step",2.5f).toDouble())
+    val prefs=context.getSharedPreferences("stem_settings",0)
+    val goal=TrainingGoal.from(prefs.getString("training_goal",null))
+    val recommendation=workoutRecommendation(previousSets,goal,prefs.getString("manual_weight","")?.replace(',','.')?.toDoubleOrNull(),prefs.getFloat("weight_step",2.5f).toDouble())
     Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){Column(Modifier.padding(18.dp)){
         Row(verticalAlignment=Alignment.CenterVertically){
             Surface(shape=MaterialTheme.shapes.small,color=androidx.compose.ui.graphics.Color.White){
@@ -138,10 +140,12 @@ val exerciseCatalog = listOf(
             IconButton(menu){Icon(Icons.Rounded.MoreVert,"Изменить")}
         }
         previous?.let{Text("Прошлый раз: ${number(it.weight)} кг × ${it.reps}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=8.dp))}
-        suggestion?.let{
-            Text("Совет: ${number(it.weight)} кг${if(it.change>0)" (+${number(it.change)})" else ""}",style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.secondary)
-            Text(it.reason,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Surface(Modifier.fillMaxWidth().padding(top=8.dp),shape=MaterialTheme.shapes.small,color=MaterialTheme.colorScheme.primaryContainer){Column(Modifier.padding(12.dp)){
+            Text("РЕКОМЕНДАЦИЯ · ${goal.title}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.secondary)
+            Text("${recommendation.weight?.let{"${number(it)} кг · "}?:"Подберите рабочий вес · "}${recommendation.sets} подхода · ${recommendation.reps.first}–${recommendation.reps.last} повторений",style=MaterialTheme.typography.titleSmall)
+            recommendation.relativeLoadPercent?.let{Text("Рабочий вес ≈ $it% массы тела",style=MaterialTheme.typography.labelSmall)}
+            Text(recommendation.reason,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }}
         if(sets.isEmpty())Text("Добавьте первый рабочий подход",Modifier.padding(vertical=14.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)else{Spacer(Modifier.height(8.dp));Surface(shape=MaterialTheme.shapes.small,color=MaterialTheme.colorScheme.surfaceVariant){Column{sets.forEachIndexed{index,set->Row(Modifier.fillMaxWidth().clickable{edit(set)}.padding(horizontal=14.dp,vertical=11.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(if(set.isWarmup)"РАЗМИНКА" else "ПОДХОД ${index+1}",style=MaterialTheme.typography.labelSmall);Text("${number(set.weight)} кг × ${set.reps}${set.rir?.let{" · RIR $it"}?:""}",fontWeight=FontWeight.Bold)};EffortButtons(set);if(index<sets.lastIndex)HorizontalDivider(Modifier.padding(horizontal=14.dp))}}}}
         TextButton(add,Modifier.align(Alignment.End)){Icon(Icons.Rounded.Add,null,Modifier.size(18.dp));Text(" Подход")}
     }}

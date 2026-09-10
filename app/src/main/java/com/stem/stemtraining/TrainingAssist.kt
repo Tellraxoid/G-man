@@ -145,12 +145,13 @@ class RestAlarmReceiver:BroadcastReceiver(){override fun onReceive(context:Conte
 @Composable fun EffortButtons(set:WorkoutSetEntity){
     if(set.isWarmup)return
     val context=LocalContext.current;val dao=remember{TrainingDatabase.getInstance(context).trainingDao()};val scope=rememberCoroutineScope()
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){listOf("Легко","Нормально","Тяжело").forEach{label->FilterChip(selected=set.effort==label,onClick={scope.launch{dao.updateSet(set.copy(effort=if(set.effort==label)null else label))}},label={Text(label)})}}
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("Легко","Нормально","Тяжело","До отказа").forEach{label->FilterChip(modifier=Modifier.weight(1f),selected=set.effort==label,onClick={scope.launch{dao.updateSet(set.copy(effort=if(set.effort==label)null else label))}},label={Text(label,maxLines=1,style=MaterialTheme.typography.labelSmall)})}}
 }
 
 fun coachAdvice(sets:List<WorkoutSetEntity>,targetReps:Int?):String {
     val work=sets.filterNot{it.isWarmup}
     if(work.isEmpty())return "Пока нет рабочих подходов для анализа."
+    if(work.any{it.effort=="До отказа"})return "Есть подход до отказа. В следующий раз снизьте вес или остановитесь за 1–2 повтора до отказа."
     if(work.any{it.effort=="Тяжело"})return "Есть тяжёлые подходы. Не спешите повышать нагрузку; сравните повторы и качество техники в следующий раз."
     if(targetReps!=null && work.all{it.reps>=targetReps && it.effort=="Легко"})return "Цель выполнена во всех рабочих подходах с оценкой «Легко». В следующий раз можно попробовать добавить одно повторение, если техника остаётся стабильной."
     return "Сохраните текущую нагрузку как ориентир. Для более точного сравнения отмечайте усилие после рабочих подходов."
