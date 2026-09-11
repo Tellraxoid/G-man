@@ -44,6 +44,26 @@ class HealthPrivacyActivity:ComponentActivity(){
 }
 
 data class HealthMetric(val title:String,val value:String,val detail:String="")
+internal fun manualBodyMetrics(context:Context):List<HealthMetric>{
+    val prefs=context.getSharedPreferences("stem_settings",0)
+    fun value(key:String)=prefs.getString(key,"")?.replace(',','.')?.toDoubleOrNull()?.takeIf{it>0}
+    return listOfNotNull(
+        value("manual_weight")?.let{HealthMetric("Вес","${number(it)} кг","Введено вручную в настройках S.T.E.M. Training")},
+        value("manual_body_fat")?.let{HealthMetric("Жир","${number(it)} %","Введено вручную в настройках S.T.E.M. Training")},
+        value("manual_muscle")?.let{HealthMetric("Мышцы","${number(it)} %","Введено вручную в настройках S.T.E.M. Training")}
+    )
+}
+internal fun withManualFallback(health:List<HealthMetric>,manual:List<HealthMetric>):List<HealthMetric>{
+    val manualByTitle=manual.associateBy{it.title}
+    val aliases=mapOf("Процент жира" to "Жир","Безжировая масса" to "Мышцы")
+    val used=mutableSetOf<String>()
+    val merged=health.map{metric->
+        val key=aliases[metric.title]?:metric.title
+        val fallback=manualByTitle[key]
+        if(fallback!=null && (metric.value.startsWith("Нет ")||metric.value.startsWith("Доступ ")||metric.value.startsWith("Не удалось")||metric.value.startsWith("Разрешение "))){used+=key;fallback}else metric
+    }
+    return merged+manual.filter{it.title !in used && merged.none{m->(aliases[m.title]?:m.title)==it.title}}
+}
 internal suspend fun permittedHealthMetric(title:String,permission:String,granted:Set<String>,read:suspend ()->HealthMetric):HealthMetric {
     if(permission !in granted)return HealthMetric(title,"Доступ не разрешён")
     return try{read()}catch(e:CancellationException){throw e}catch(e:SecurityException){HealthMetric(title,"Разрешение отозвано")}catch(e:Exception){HealthMetric(title,"Не удалось прочитать; попробуйте обновить")}
@@ -125,6 +145,13 @@ class HealthReader(private val client:HealthConnectClient){
     val launcher=rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()){granted->
         enabled=granted.any{it in healthReadPermissions};prefs.edit().putBoolean("health_enabled",enabled).apply();revision++
     }
+    DisposableEffect(prefs){
+        val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener{_,key->
+            if(key in setOf("manual_weight","manual_body_fat","manual_muscle"))revision++
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose{prefs.unregisterOnSharedPreferenceChangeListener(listener)}
+    }
     DisposableEffect(lifecycle){val observer=LifecycleEventObserver{_,event->if(event==Lifecycle.Event.ON_RESUME){foreground=true;revision++}else if(event==Lifecycle.Event.ON_PAUSE){foreground=false;metrics=emptyList()}};lifecycle.addObserver(observer);onDispose{lifecycle.removeObserver(observer)}}
     LaunchedEffect(foreground,enabled,revision){
         metrics=emptyList();status="";busy=false
@@ -132,7 +159,7 @@ class HealthReader(private val client:HealthConnectClient){
         availability=HealthConnectClient.getSdkStatus(context)
         if(enabled && availability==HealthConnectClient.SDK_AVAILABLE){
             busy=true
-            try{metrics=HealthReader(HealthConnectClient.getOrCreate(context)).read()+readStemNutrition(context);status="Обновлено: ${healthTime(Instant.now())}"}
+            try{metrics=withManualFallback(HealthReader(HealthConnectClient.getOrCreate(context)).read(),manualBodyMetrics(context))+readStemNutrition(context);status="Обновлено: ${healthTime(Instant.now())}"}
             catch(e:CancellationException){throw e}
             catch(e:Exception){status="Health Connect недоступен или доступ отозван. Проверьте разрешения."}
             finally{busy=false}
@@ -159,6 +186,7 @@ class HealthReader(private val client:HealthConnectClient){
                 if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
                 metrics.forEach{HealthMetricCard(it)}
             }else if(!compact){
+                manualBodyMetrics(context).forEach{HealthMetricCard(it)}
                 Text("Вес, жир, безжировая масса, сон и питание из ваших приложений — в одном месте.",style=MaterialTheme.typography.bodyMedium)
                 FilledTonalButton({privacy=true}){Text("Подключить Health Connect")}
             }
