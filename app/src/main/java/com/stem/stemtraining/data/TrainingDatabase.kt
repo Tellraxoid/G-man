@@ -47,6 +47,9 @@ data class ProgramWithExercises(@Embedded val program: ProgramEntity, @Relation(
     @Query("DELETE FROM workouts WHERE id = :id") suspend fun deleteWorkout(id: Long)
     @Query("DELETE FROM program_exercises WHERE programId = :programId") suspend fun clearProgramExercises(programId: Long)
     @Query("DELETE FROM programs WHERE id = :id") suspend fun deleteProgram(id: Long)
+    @Query("SELECT COUNT(*) FROM workouts WHERE endedAt IS NOT NULL AND startedAt >= :since") fun completedSince(since: Long): Int
+    @Query("SELECT MAX(startedAt) FROM workouts WHERE endedAt IS NOT NULL") fun latestCompletedAt(): Long?
+    @Query("SELECT COUNT(workout_sets.id) FROM workout_sets INNER JOIN exercises ON exercises.id = workout_sets.exerciseId INNER JOIN workouts ON workouts.id = exercises.workoutId WHERE workouts.endedAt IS NOT NULL AND workouts.startedAt >= :since AND workout_sets.isWarmup = 0") fun workingSetsSince(since: Long): Int
     @Query("SELECT COUNT(*) FROM programs") suspend fun programCount(): Int
     @Query("SELECT * FROM workouts ORDER BY id") suspend fun allWorkouts(): List<WorkoutEntity>
     @Query("SELECT * FROM exercises ORDER BY id") suspend fun allExercises(): List<ExerciseEntity>
