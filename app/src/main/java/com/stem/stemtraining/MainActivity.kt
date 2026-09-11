@@ -14,6 +14,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,7 +27,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -90,9 +94,26 @@ val exerciseCatalog = listOf(
                 val index=exercises.indexOf(exercise)
                 val next=exercises.getOrNull(index+1)
                 val previousLinked=exercises.getOrNull(index-1)?.supersetNext==true
-                Column {
+                var dragOffset by remember(exercise.id){mutableFloatStateOf(0f)}
+                var dragging by remember(exercise.id){mutableStateOf(false)}
+                val threshold=with(LocalDensity.current){72.dp.toPx()}
+                Column(Modifier.graphicsLayer{translationY=dragOffset;alpha=if(dragging)0.9f else 1f}.pointerInput(exercise.id,index,exercises.size){
+                    detectDragGesturesAfterLongPress(
+                        onDragStart={dragging=true},
+                        onDragCancel={dragOffset=0f;dragging=false},
+                        onDragEnd={dragOffset=0f;dragging=false},
+                        onDrag={change,amount->
+                            change.consume();dragOffset+=amount.y
+                            val target=when{dragOffset>threshold->index+1;dragOffset< -threshold->index-1;else->index}
+                            if(target in exercises.indices&&target!=index){
+                                dragOffset=0f
+                                scope.launch{dao.reorderExercises(moved(exercises,index,target))}
+                            }
+                        }
+                    )
+                }) {
                     if(previousLinked || exercise.supersetNext)Text(if(previousLinked)"СУПЕРСЕТ · A2" else "СУПЕРСЕТ · A1",color=MaterialTheme.colorScheme.secondary)
-                    ExerciseCard(exercise,sets.filter{it.exerciseId==exercise.id},{setFor=exercise},{editSet=it},{editExercise=exercise})
+                    ExerciseCard(exercise,sets.filter{it.exerciseId==exercise.id},{setFor=exercise},{editSet=it},{editExercise=exercise},dragging=dragging)
                     if(next!=null && !previousLinked && !next.supersetNext)TextButton({scope.launch{dao.updateExercise(exercise.copy(supersetNext=!exercise.supersetNext))}}){Text(if(exercise.supersetNext)"Разъединить суперсет" else "Суперсет со следующим упражнением")}
                 }
             }
@@ -124,7 +145,7 @@ val exerciseCatalog = listOf(
 
 @Composable private fun ActiveTimer(startedAt: Long, exercises: Int, sets: Int, volume: Double) { var now by remember { mutableLongStateOf(System.currentTimeMillis()) }; LaunchedEffect(startedAt) { while (true) { now = System.currentTimeMillis(); delay(1000) } }; val seconds = ((now - startedAt) / 1000).coerceAtLeast(0); Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Column(Modifier.padding(20.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.Timer, null); Spacer(Modifier.width(8.dp)); Text("АКТИВНАЯ СЕССИЯ", style = MaterialTheme.typography.labelLarge) }; Spacer(Modifier.height(16.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Metric(String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60), "время"); Metric(exercises.toString(), "упр."); Metric(sets.toString(), "подх."); Metric(number(volume), "кг") } } } }
 @Composable private fun Metric(value: String, label: String) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(value, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.labelSmall) } }
-@Composable private fun ExerciseCard(exercise:ExerciseEntity,sets:List<WorkoutSetEntity>,add:()->Unit,edit:(WorkoutSetEntity)->Unit,menu:()->Unit){
+@Composable private fun ExerciseCard(exercise:ExerciseEntity,sets:List<WorkoutSetEntity>,add:()->Unit,edit:(WorkoutSetEntity)->Unit,menu:()->Unit,dragging:Boolean=false){
     val context=LocalContext.current
     val dao=remember{TrainingDatabase.getInstance(context).trainingDao()}
     val previous by dao.observePreviousSet(exercise.name).collectAsState(initial=null)
@@ -133,7 +154,7 @@ val exerciseCatalog = listOf(
     val prefs=context.getSharedPreferences("stem_settings",0)
     val goal=TrainingGoal.from(prefs.getString("training_goal",null))
     val recommendation=workoutRecommendation(previousSets,goal,prefs.getString("manual_weight","")?.replace(',','.')?.toDoubleOrNull(),prefs.getFloat("weight_step",2.5f).toDouble())
-    Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){Column(Modifier.padding(18.dp)){
+    Card(Modifier.fillMaxWidth(),elevation=CardDefaults.cardElevation(defaultElevation=if(dragging)10.dp else 0.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){Column(Modifier.padding(18.dp)){
         Row(verticalAlignment=Alignment.CenterVertically){
             Surface(shape=MaterialTheme.shapes.small,color=androidx.compose.ui.graphics.Color.White){
                 Image(painterResource(exerciseIcon(exercise.name)),"Открыть описание ${exercise.name}",Modifier.size(74.dp).clickable{details=true},contentScale=ContentScale.Crop)

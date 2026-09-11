@@ -37,6 +37,11 @@ data class ProgramWithExercises(@Embedded val program: ProgramEntity, @Relation(
     @Insert suspend fun insertProgramExercises(exercises: List<ProgramExerciseEntity>)
     @Update suspend fun updateSet(set: WorkoutSetEntity)
     @Update suspend fun updateExercise(exercise: ExerciseEntity)
+    @Transaction suspend fun reorderExercises(exercises:List<ExerciseEntity>){
+        if(exercises.isEmpty())return
+        val first=exercises.minOf{it.createdAt}
+        exercises.forEachIndexed{index,exercise->updateExercise(exercise.copy(createdAt=first+index))}
+    }
     @Update suspend fun updateProgram(program: ProgramEntity)
     @Update suspend fun updateWorkout(workout: WorkoutEntity)
     @Query("UPDATE workouts SET endedAt = :endedAt WHERE id = :workoutId") suspend fun finishWorkout(workoutId: Long, endedAt: Long = System.currentTimeMillis())

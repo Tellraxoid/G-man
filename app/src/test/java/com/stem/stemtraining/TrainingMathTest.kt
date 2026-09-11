@@ -19,4 +19,34 @@ class TrainingMathTest{
         val sets=listOf(PreviousWorkoutSetRow(60.0,10,"Легко"),PreviousWorkoutSetRow(60.0,9,null))
         assertEquals(60.0,suggestedNextWeight(sets,2.5)!!.weight,0.001)
     }
+    @Test fun goalControlsSetsAndRepRange(){
+        val r=workoutRecommendation(emptyList(),TrainingGoal.ENDURANCE,95.0,2.5)
+        assertEquals(3,r.sets);assertEquals(15..20,r.reps);assertNull(r.weight)
+    }
+    @Test fun failureReducesRecommendedWeight(){
+        val previous=List(3){PreviousWorkoutSetRow(80.0,8,"До отказа")}
+        assertEquals(77.5,workoutRecommendation(previous,TrainingGoal.MUSCLE_GAIN,95.0,2.5).weight!!,0.001)
+    }
+    @Test fun bodyWeightAddsRelativeContext(){
+        val previous=List(3){PreviousWorkoutSetRow(95.0,12,"Нормально")}
+        assertEquals(103,workoutRecommendation(previous,TrainingGoal.RECOMPOSITION,95.0,2.5).relativeLoadPercent)
+    }
+    @Test fun normalEffortAddsOneRepBeforeIncreasingWeight(){
+        val previous=List(3){PreviousWorkoutSetRow(80.0,10,"Нормально")}
+        val result=workoutRecommendation(previous,TrainingGoal.MUSCLE_GAIN,95.0,2.5)
+        assertEquals(80.0,result.weight!!,0.001);assertEquals(11,result.recommendedReps)
+    }
+    @Test fun weightIncreaseResetsRepsToBottomOfRange(){
+        val previous=List(3){PreviousWorkoutSetRow(80.0,12,"Нормально")}
+        val result=workoutRecommendation(previous,TrainingGoal.MUSCLE_GAIN,95.0,2.5)
+        assertEquals(82.5,result.weight!!,0.001);assertEquals(8,result.recommendedReps)
+    }
+    @Test fun heavyEffortDoesNotAddReps(){
+        val previous=List(3){PreviousWorkoutSetRow(80.0,9,"Тяжело")}
+        assertEquals(9,workoutRecommendation(previous,TrainingGoal.MUSCLE_GAIN,95.0,2.5).recommendedReps)
+    }
+    @Test fun movesExerciseToRequestedPosition(){
+        assertEquals(listOf("B","C","A"),moved(listOf("A","B","C"),0,2))
+        assertEquals(listOf("A","B","C"),moved(listOf("A","B","C"),-1,2))
+    }
 }
