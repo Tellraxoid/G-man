@@ -24,18 +24,25 @@ fun suggestedNextWeight(sets:List<PreviousWorkoutSetRow>,step:Double):LoadSugges
     return LoadSuggestion(base+change,change,reason)
 }
 
-data class WorkoutRecommendation(val weight:Double?,val sets:Int,val reps:IntRange,val reason:String,val relativeLoadPercent:Int?=null)
+data class WorkoutRecommendation(val weight:Double?,val sets:Int,val reps:IntRange,val recommendedReps:Int,val reason:String,val relativeLoadPercent:Int?=null)
 fun workoutRecommendation(previous:List<PreviousWorkoutSetRow>,goal:TrainingGoal,athleteWeight:Double?,step:Double):WorkoutRecommendation{
     val valid=previous.filter{it.weight>0&&it.reps>0};val targetSets=if(valid.isEmpty())goal.sets.first else valid.size.coerceIn(goal.sets.first,goal.sets.last)
-    if(valid.isEmpty())return WorkoutRecommendation(null,targetSets,goal.reps,"Первой записи пока нет. Подберите вес, с которым останется 2–3 повтора в запасе, и отметьте тяжесть каждого подхода.")
+    if(valid.isEmpty())return WorkoutRecommendation(null,targetSets,goal.reps,goal.reps.first,"Первой записи пока нет. Подберите вес, с которым останется 2–3 повтора в запасе, и отметьте тяжесть каждого подхода.")
     val safeStep=step.coerceAtLeast(0.5)
     val base=valid.groupingBy{it.weight}.eachCount().entries.sortedWith(compareByDescending<Map.Entry<Double,Int>>{it.value}.thenByDescending{it.key}).first().key
     val allRated=valid.all{!it.effort.isNullOrBlank()};val failed=valid.any{it.effort=="До отказа"};val heavy=valid.any{it.effort=="Тяжело"};val easy=allRated&&valid.all{it.effort=="Легко"};val repsMet=valid.all{it.reps>=goal.reps.first}
     val change=when{failed->-safeStep;heavy||!repsMet||!allRated->0.0;goal==TrainingGoal.ENDURANCE&&valid.any{it.reps<goal.reps.last}->0.0;easy->safeStep;valid.all{it.reps>=goal.reps.last}->safeStep;else->0.0}
     val recommended=round((base+change).coerceAtLeast(safeStep)/safeStep)*safeStep
+    val previousReps=valid.map{it.reps}.sorted()[valid.size/2].coerceIn(goal.reps.first,goal.reps.last)
+    val recommendedReps=when{
+        change>0 -> goal.reps.first
+        failed||heavy||!repsMet -> previousReps
+        allRated -> (previousReps+1).coerceAtMost(goal.reps.last)
+        else -> previousReps
+    }
     val relative=athleteWeight?.takeIf{it>0}?.let{round(recommended/it*100).toInt()}
     val reason=when{failed->"Прошлый раз был подход до отказа — снизьте вес на один шаг и оставьте 1–3 повтора в запасе.";!allRated->"Не все подходы оценены — сохраните основной вес и отметьте тяжесть после каждого подхода.";heavy->"Прошлая тренировка была тяжёлой — повторите вес, пока все целевые повторы не станут уверенными.";!repsMet->"Нижняя граница повторений не выполнена — вес пока не повышаем.";goal==TrainingGoal.ENDURANCE&&change==0.0->"Для выносливости сначала доведите подходы до ${goal.reps.last} повторений, затем повышайте вес.";change>0->"Целевой диапазон выполнен уверенно — добавьте один шаг веса при сохранении техники.";else->"Сохраните вес и постепенно двигайтесь к верхней границе повторений."}
-    return WorkoutRecommendation(recommended,targetSets,goal.reps,reason,relative)
+    return WorkoutRecommendation(recommended,targetSets,goal.reps,recommendedReps,reason,relative)
 }
 fun platesPerSide(totalWeight:Double,barWeight:Double=20.0,available:List<Double> = listOf(25.0,20.0,15.0,10.0,5.0,2.5,1.25)):List<Double>{var left=((totalWeight-barWeight)/2).coerceAtLeast(0.0);val result=mutableListOf<Double>();available.forEach{plate->while(left+0.001>=plate){result+=plate;left-=plate}};return result}
 fun workoutVolume(sets:List<Pair<Double,Int>>)=sets.sumOf{it.first*it.second}
